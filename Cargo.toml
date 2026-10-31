@@ -1,6 +1,13 @@
 [workspace]
 resolver = "2"
-members = ["crates/rg-primitives", "crates/rg-keys", "crates/rg-notes"]
+members = [
+  "crates/rg-primitives",
+  "crates/rg-keys",
+  "crates/rg-notes",
+  "crates/rg-tree",
+  "crates/rg-sync",
+  "crates/rg-wallet",
+]
 
 [workspace.package]
 edition = "2021"
@@ -28,3 +35,9 @@ thiserror = "2"
 tiny-keccak = { version = "2", features = ["keccak"] }
 rg-primitives = { path = "crates/rg-primitives" }
 rg-keys = { path = "crates/rg-keys" }
+rg-notes = { path = "crates/rg-notes" }
+rg-tree = { path = "crates/rg-tree" }
+rg-sync = { path = "crates/rg-sync" }
+alloy-primitives = { version = "1", default-features = false, features = ["std", "serde"] }
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+alloy-sol-types = { version = "1", default-features = false, features = ["std"] }

@@ -17,6 +17,13 @@ through UniFFI. See `scope.md` for the plan and milestones.
   commitments, nullifiers, memo text, annotation data, V2 transact note ciphertexts
   (encrypt, decrypt as receiver, decrypt as sender) and shield ciphertexts. The harness
   pins every IV and random the engine draws, so ciphertexts compare byte for byte.
+- M3: `crates/rg-tree` (depth-16 Poseidon Merkle tree, proofs), `crates/rg-sync`
+  (V2.1 proxy event decoding with `alloy-sol-types`, trees and nullifiers rebuilt from
+  logs, root history, `transact` calldata roots; optional `rpc` feature with a blocking
+  JSON-RPC client) and `crates/rg-wallet` (trial decryption, TXOs, spent status, sent
+  notes, balances). Checked on the full Sepolia history to block 12031295: every root
+  a successful `transact` call used is in the rebuilt history, and the TS engine gets
+  the same root, TXOs, spends and balances for the same wallet.
 
 ## Running the tests
 
@@ -40,6 +47,21 @@ HARNESS_NODE_MODULES=/path/to/node_modules node harness/gen-vectors.js vectors
 
 Randomness in the harness is derived from a fixed seed, so a rerun gives the same files.
 A change in `vectors/` after a rerun means the engine's behaviour changed.
+
+## Sepolia sync check (M3)
+
+`data/` is not committed. It holds the proxy's logs as JSONL (one `eth_getLogs` object
+per line; Etherscan's logs API gives the same shape) and successful `transact` calls.
+
+```
+cargo run --release -p rg-sync --example check_roots -- data/sepolia-logs.jsonl data/sepolia-transact-calls.json
+cargo run --release -p rg-wallet --example scan_file -- data/sepolia-logs.jsonl <mnemonic-file> > /tmp/rust-scan.json
+HARNESS_NODE_MODULES=/path/to/node_modules node harness/m3.js data/sepolia-logs.jsonl <mnemonic-file> /tmp/rust-scan.json
+cargo test --release -p rg-wallet -- --ignored   # full-history test, needs data/
+```
+
+`vectors/m3/` holds the first 200 Sepolia logs and the engine's result for them, which
+the default test run checks.
 
 ## Rust to TS check
 
@@ -67,6 +89,12 @@ HARNESS_NODE_MODULES=/path/to/node_modules node harness/check-rust.js /tmp/rust-
   that when a wallet source is set, not when encoding.
 - `memo::decrypt_annotation` returns none for annotation data under 32 bytes, where the
   engine would return truncated fields.
+
+- `rg_wallet` drops a shield note whose note public key is not
+  `poseidon(ourMPK, random)`; the engine keeps any shield whose random decrypts. Such a
+  note could not be spent.
+- `rg_sync` handles V2.1 events only (all Sepolia has). Legacy pre-March-2023 events on
+  other chains, reorgs and persistent storage are not done yet.
 
 ## Licensing
 

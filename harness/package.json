@@ -7,6 +7,7 @@
     "vectors": "node gen-vectors.js ../vectors"
   },
   "dependencies": {
-    "@railgun-community/engine": "9.6.0"
+    "@railgun-community/engine": "9.6.0",
+    "memdown": "^6.1.1"
   }
 }

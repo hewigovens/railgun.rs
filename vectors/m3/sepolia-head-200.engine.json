@@ -1,0 +1,51 @@
+{
+  "counts": {
+    "shield": 89,
+    "transact": 33,
+    "nullified": 51
+  },
+  "nullifiers": 68,
+  "trees": [
+    {
+      "leaves": 141,
+      "root": "0x04ab51cd3a79ebe8303fff647316fa48dc090e2c49d261defa80eff7bb758552"
+    }
+  ],
+  "txos": [
+    {
+      "tree": 0,
+      "position": 3,
+      "tokenHash": "0x000000000000000000000000fff9976782d46cc05630d1f6ebab18b2324d6b14",
+      "value": "20000000000000000",
+      "nullifier": "0x20c298d97725e32e8b449c0dde7c3cb509b2fb791b433b2f653384598fca6c85",
+      "spentTxid": "0xf52790a2110368e52264e71b2f8d65aad5ad13ded59cf7456c31921b0fe66472"
+    },
+    {
+      "tree": 0,
+      "position": 5,
+      "tokenHash": "0x000000000000000000000000fff9976782d46cc05630d1f6ebab18b2324d6b14",
+      "value": "15000000000000000",
+      "nullifier": "0x05ee697abefc2e2796326d2ffb7686550d0aaf3a922c5ccb5360454c3d8f4625",
+      "spentTxid": "0xcf883ad3c31b44a1ef34605cfa8b26aa6b39f3c31fd0289acd66d534cee13ff5"
+    },
+    {
+      "tree": 0,
+      "position": 130,
+      "tokenHash": "0x000000000000000000000000d99e898842c566be038bf898b3e406f028a031e0",
+      "value": "9975000",
+      "nullifier": "0x09dd384680856f5343e611ad0202e752a4e436ef3ef84b08300452169fdd7221",
+      "spentTxid": null
+    }
+  ],
+  "sent": [
+    {
+      "tree": 0,
+      "position": 5,
+      "tokenHash": "0x000000000000000000000000fff9976782d46cc05630d1f6ebab18b2324d6b14",
+      "value": "15000000000000000"
+    }
+  ],
+  "balances": {
+    "0x000000000000000000000000d99e898842c566be038bf898b3e406f028a031e0": "9975000"
+  }
+}
