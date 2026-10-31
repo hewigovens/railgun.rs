@@ -1,0 +1,178 @@
+{
+  "meta": {
+    "generator": "harness/gen-vectors.js",
+    "engineVersion": "9.6.0",
+    "seed": "railgun-rust-core-vectors-v1"
+  },
+  "data": {
+    "scalars": [
+      {
+        "privateKey": "2f74d9c2a1cea97d51523ad66c1a6b002b076c48d3a22d3dabb80a25866bb9b5",
+        "scalar": "6840575688483884436112815385199122631262537803145397231524519267776726792434"
+      },
+      {
+        "privateKey": "8c639a55ec9ce52038645d891e04c824a5eed9205a6eb1d78808861b37f92e0a",
+        "scalar": "2228589218376852078255251629139223398539094702341971185863770644199638815866"
+      },
+      {
+        "privateKey": "aff9c766398e969c721e4aadbfbcb78b3da90408841674ab19832dd459a112bb",
+        "scalar": "4854169983267892066668978668125948495946578835494760409356614079949155895631"
+      },
+      {
+        "privateKey": "c44d9027a9f463da4139e728b2f11ae72e56d4305a4db17cb4669783e0ed70f7",
+        "scalar": "771860145706903425006024197482740636674433902071345795381970347416942610106"
+      },
+      {
+        "privateKey": "47ae0b4f33a9c69db1676175b9b2ca68ffc0efd587c8caaf55c065417e43c591",
+        "scalar": "3297255006661994291969876879085316358045333579640121646396250076882295458660"
+      },
+      {
+        "privateKey": "9e5be8f019a3bfff0ba489dff2978767ac9322dd1b5fa3cf40de42074e428e28",
+        "scalar": "4450596519498580575560729852444628451847599298817369521904013800209955994036"
+      },
+      {
+        "privateKey": "0b29665867c9315116072ea1444ebe12ef54226ce1ccb12bc0c23ee6f0bbbf74",
+        "scalar": "1960085062505880216315585337361625110598360152674075586682710255584512764733"
+      },
+      {
+        "privateKey": "24c5c3eabc5a3cd07d021cb2d283e44e4aeda3088ca851edbc403a4e7d7482df",
+        "scalar": "6519028013408596640503984368585641717086664611698430355837011212491235298234"
+      }
+    ],
+    "blinding": [
+      {
+        "senderViewingPrivateKey": "a07e305afe9e00bccb57d2644f87337ce2859bcf8f90f1aab652e5182089a422",
+        "senderViewingPublicKey": "d35508d45b39bb747e2bc776871466b38800c869a8aa632313ce0d0e16a159c0",
+        "receiverViewingPrivateKey": "60992abdb6484d4620ed99384774aeb1daf89484b15ee596fbc84ef6060eeede",
+        "receiverViewingPublicKey": "19b2b5b8ae44f9737622967072590989820bef90131876a91ed9695f4c150d66",
+        "random": "adfbf038a62b86d65601412f2f1d2441",
+        "senderRandom": "000000000000000000000000000000",
+        "blindedSenderViewingKey": "f81a5c3dff3a0cfd035c9ed4cdb9ee543c79708fc22f012b206b6e6b8f55e6d9",
+        "blindedReceiverViewingKey": "4052f91174d8e5a05ca6f96885712280a3810f4cbb83d03031118102fb8c6ee7",
+        "sharedKey": "fa084a78bd6cb46d964f1fde50387d1f2c9cb8e1491c1aa5ab335bdc2307fec1"
+      },
+      {
+        "senderViewingPrivateKey": "9a0488f7c17648bf96b399769e257c5625bc754e03a2b204d6212930b54c4f18",
+        "senderViewingPublicKey": "5fd628357f83da6cc8d099d052319b2093901122617a9385a710cebbe4bb1b0c",
+        "receiverViewingPrivateKey": "916afae4f2f25b0f7e45c56f596f0e7e370793879f78288de135050b2f58ddd5",
+        "receiverViewingPublicKey": "009b105c8281f2f73965e07f8ccf0a1a086f95b448fed6838fa3bc4fe849c62f",
+        "random": "a34f6be566a1429dc3fb0dd9f64560ae",
+        "senderRandom": "4cbe60240724fafb1139e963193f27",
+        "blindedSenderViewingKey": "3e728bbcecd5b9cd2fa3ff0396458a9b66a0e653180f681aa6c96e45761ef074",
+        "blindedReceiverViewingKey": "1b26ae0b99c77c12fdcb2b5be0a38a4e52a3a7ef43fc880e5bde13864ade0beb",
+        "sharedKey": "a78115bbaf54c601364cf9c3dd46ff78cdea953ffbdba5e307ea2c7eb3b6b7c0"
+      },
+      {
+        "senderViewingPrivateKey": "5cdf7516ef8155961f5602ce4a135f27301f52f041846f11846c23f24a2da12a",
+        "senderViewingPublicKey": "62bbab3ea2607472440d1e94a6d5571996d8fda08f601f762aad2a9a0261b7f4",
+        "receiverViewingPrivateKey": "36c0d5b9fef96399b7d4300b799fcb0fe9982355269887e0506aa39660a4d0dd",
+        "receiverViewingPublicKey": "2875ce35c41b9c29c19b54cfd2202e566b7b94749d9fa86732b03d29f44198e2",
+        "random": "3909970686cfb47998712c1caf759377",
+        "senderRandom": "141e1620d4660445c7c326c8df91a6",
+        "blindedSenderViewingKey": "e52275b6c12b4bb7ddc69d333ae4179161e53d462d66551517bdcc4b71c233da",
+        "blindedReceiverViewingKey": "5f4dcb178788b59d38d60bb76699348d435e9dd94641c24665e3c67c18432513",
+        "sharedKey": "ad201c534eb73a1a28c3c23c60a30005c3585c438afd148f23c2c914c8f81259"
+      },
+      {
+        "senderViewingPrivateKey": "f0fc3a57207eb87938a4a2401562b54b198ab4c468e825cd0970b45a4bcce971",
+        "senderViewingPublicKey": "91b6716e6d19a240e1615444105772edfb6d744e9b1ce47d6233f5500bc04acc",
+        "receiverViewingPrivateKey": "95e795bf1f61d8f3c90795e52546b1633e60f43ae7c9d2d28ef92079eb27b766",
+        "receiverViewingPublicKey": "fef6fed2ef99be4f752a4fc9d2576800659a5a87b0bbcb87e14b94557158beda",
+        "random": "0670cf9755e8f0d9c3b2e4afc50606a2",
+        "senderRandom": "000000000000000000000000000000",
+        "blindedSenderViewingKey": "c0b7b96743a515c4e33f942aef7b4e901d8ffb2d3cf25ab196df9f75f32de54c",
+        "blindedReceiverViewingKey": "00ccf7bffaf9df2589c107ca8741191ba81a8b34485a01adaf0c1b8a3ff0ff83",
+        "sharedKey": "454914ed186e7646555c8d0cf96a64070a4816224be61807370d1ac4df2c8d36"
+      },
+      {
+        "senderViewingPrivateKey": "214c963c7b23ade251ece11294268daf0625082bd95bd32d3d3d9733e0230e8a",
+        "senderViewingPublicKey": "eaa5dbe4016da2a9e9c7befdde7eb341d41d94695d7dbf371587d6bcd4a69665",
+        "receiverViewingPrivateKey": "37372e7b3c2ed712beb77b68a2a865a7741aea96f17a01c81b79f8254734206a",
+        "receiverViewingPublicKey": "576fc7e23241cc407347bede83469c4941b53a14c7235bace3d30fcd3389db8c",
+        "random": "faa278d9b0781f6f075cd369023fadea",
+        "senderRandom": "42dfd1104e37c6f0c9e8cc03884b97",
+        "blindedSenderViewingKey": "12cc0c845b39668050c17a90c1478a0575c766d638a53da82a798ca3f09c9d01",
+        "blindedReceiverViewingKey": "858e455bc6fce6f80892baa1d8e0f108e08d829c7b1a972b66f906c2f07c2a5f",
+        "sharedKey": "c037113432a551b17b6888173b413f40d1fcff284d0491a265d41f4fae62fc79"
+      },
+      {
+        "senderViewingPrivateKey": "91bff19fb4939e2e0b2a86e8e75ce77a566b3e9a4ddfd703ed9d17e85c0c28f1",
+        "senderViewingPublicKey": "beb270e654d42fb5e2229ed0e8612c9242f3810bd83b654c9cb6f6974ee1d428",
+        "receiverViewingPrivateKey": "97c5d57e86221500b96116fdbf269d7af7491c9a850ad2094b039042e0f958d3",
+        "receiverViewingPublicKey": "746b4ab097671241406d7f9b9aac8aaf75948abf1ae8b51c69874a5f6d7b7be7",
+        "random": "b37208173e56f55988752ffdf4df10a5",
+        "senderRandom": "90c7f0c8116cb472bd879823b44fc9",
+        "blindedSenderViewingKey": "6e3979a68b48dba93aeb1949e4054d2e0a51cffc9fc5481ca1d14619453f85b7",
+        "blindedReceiverViewingKey": "7f7c595b1b3f8a846472a9f282f5db846a488235750e24481cb888b33010b642",
+        "sharedKey": "2dc964e04ac8ad7779246469b8edf101a6219b9c19264d084ff240dc1f4477cb"
+      },
+      {
+        "senderViewingPrivateKey": "c9acb24899a0633bd8a992cd127876a81ea2efbe81f1f245ed3accf8335e32ce",
+        "senderViewingPublicKey": "ceb394a1fce0de83b02b91cf1fe5e949e20978a9e15e2ac65e3c5bada322debc",
+        "receiverViewingPrivateKey": "718c1c8bf3705378470fe49ab68c81ae8952f00cfdbb2629d8de7172824a14eb",
+        "receiverViewingPublicKey": "1bf923737b100949299bbf5e5b16779964e8f2b9bb78efa61f2efced6d847168",
+        "random": "d34b36d6fba9281ffedbb921c0a666b9",
+        "senderRandom": "000000000000000000000000000000",
+        "blindedSenderViewingKey": "0a5716542fd0765e2bad7e57d27fa7395c8b1cd482d66c157ee0601cd24eb88e",
+        "blindedReceiverViewingKey": "e1aea2b61fc434ead2bfaa8fcb2649b65f3e86b7c876fad34a5f12de61d6c2c1",
+        "sharedKey": "56e248668cc5a2ab497ac2bad5cfc2ffde5f2797f9effeaf306d6e781a43adb7"
+      },
+      {
+        "senderViewingPrivateKey": "588e18ae273719afa5f78732fdf9b54250b2bd5fc227e3954591bc38201b20b5",
+        "senderViewingPublicKey": "8350ede212dbf9800aa2bf6fdc86207a2a4d5dc326fb13f1b016baf0bfbd49a2",
+        "receiverViewingPrivateKey": "73ed7ddb65ca6a2a9003b7209ffe470bb988c6109af0e7b303d67c7dc275c41e",
+        "receiverViewingPublicKey": "e19e62d2b933a8e0aa80de72e3fe3fd1e629dc843de5fec1faf4321a473a94bb",
+        "random": "68456ecc3f474a2c20152d5d6d7a52a9",
+        "senderRandom": "b4a6ee18833e5cbdf552f8c80d8a8c",
+        "blindedSenderViewingKey": "12912cbee3f56c1cebe16a3757baef6f6e105272c36265254f7b73c4d3bc8f15",
+        "blindedReceiverViewingKey": "8b84787cf7c1b11f2652aa586b68224c9b23915656aaee634758796cff681991",
+        "sharedKey": "1934720b7678c090c4055de3c4f494884bb1fda78a7e22ab63ab0b975b477a4f"
+      },
+      {
+        "senderViewingPrivateKey": "e1c8d13e436ea26aff2c926842c55a95c26ef22844758368eab9ccd3a270dec8",
+        "senderViewingPublicKey": "08da589c2cf9a2b47d8ad37065c46bd3e1b5874b1f89ada7605257491eafe328",
+        "receiverViewingPrivateKey": "d4f8b896a446892be67fd4215c2108adc698ec9e98b581df14c4a6fef6f9b49b",
+        "receiverViewingPublicKey": "69f6696691f892879ebd53f02bd9bba0b25ff8a3c299b5e908b02e86a2c7df68",
+        "random": "c0b1f8aaebda52a5f966f3c86a103f40",
+        "senderRandom": "acf1594a2496368117076859b7c9c6",
+        "blindedSenderViewingKey": "2ecc74428990cd63a1d0cef1ededd05a2657c444a8eac655b99b3ac0c5a7832f",
+        "blindedReceiverViewingKey": "59c15690ce84371ed41e3127cc8b9cd8e8ee09f300b2729ed1f217636c97f912",
+        "sharedKey": "73fd9cc4d9828cd2f314ca8f4bc1fcaebc46c76856f524961257c71bfb300a26"
+      },
+      {
+        "senderViewingPrivateKey": "914417e786127254685ad5690b9b837e43f355353f7c10c02641852a81f8c917",
+        "senderViewingPublicKey": "03778316fdc56551881c7ff33a2b33fc60212ffb8d1d6a30ba369e8ec52bceb6",
+        "receiverViewingPrivateKey": "5f60bb3816b78366b3e73df3444f5169e45a722b9c227cfbe0ffc0b167ae450d",
+        "receiverViewingPublicKey": "7cef0e69f903476e3617b0abe41e7197fd692522198a2deae14e40cc604f1cb1",
+        "random": "925b63b9b4e447baf43bef857d14a2f4",
+        "senderRandom": "000000000000000000000000000000",
+        "blindedSenderViewingKey": "4000b498688450bab1bd8dd08925659960d20ec7899bd93fc89907f52699e276",
+        "blindedReceiverViewingKey": "43398a2e5e74c0056d1cb1078cb74d5d8ea4641be305b3ffcb0207680d1453f9",
+        "sharedKey": "edf9836b434efe89de853edece3fac9785905a10c817436b2fa060d732abd289"
+      },
+      {
+        "senderViewingPrivateKey": "b8da5301a87a459c64970a29702218db4f91d021029a917513874b3e729de52e",
+        "senderViewingPublicKey": "720a89f54be588d58c6f06d18b53168178817ad23f12dc7b5ff63febe5bb1f96",
+        "receiverViewingPrivateKey": "5620aef63df86275ab9408ae62a67a8e8075520b634b5eddeb7b557ef5d20514",
+        "receiverViewingPublicKey": "56842e6b0c90d1f9ee58eb312700c67cb7432068446475c159bccbd469ac8c40",
+        "random": "6721d751ac506c20e8027ff61c34d0ca",
+        "senderRandom": "5702d9a7d9537e3c9298c244c670e0",
+        "blindedSenderViewingKey": "97b64cce7847d98b2e6aeeaf9a274ef4b4edac383c51aa4d677061e4e9522182",
+        "blindedReceiverViewingKey": "5d6a6bfa674e99f19b9ba2f6ebb55541d0b9746ffdcc69c83e16274de95e71a9",
+        "sharedKey": "031bbf4fb27946e085bdb1b7b7e74729287bc8b5bbade1ec7016e6c2996dbeb6"
+      },
+      {
+        "senderViewingPrivateKey": "06ca88d4b0579e900d88f88eaffa1bdfca3624670a6a82b61972f8f4f3a0b8f7",
+        "senderViewingPublicKey": "8a04bc15956a54008f1f675e06dd1ef0d968ca8ccff2e8a49420254df4af42a3",
+        "receiverViewingPrivateKey": "d45fcd1a9cec25a3b6204b3c70cb62e183ec47286771231ea768609a4fcbae29",
+        "receiverViewingPublicKey": "0bf51e665056a6d8008df217228a7bb9eb3044d740f6cc5299bb16e3d7db2278",
+        "random": "621c1a25c17090c08272b14e50b83881",
+        "senderRandom": "bcbf64878309e0b42e7dc192a03180",
+        "blindedSenderViewingKey": "ae202313d9a72fac8056c5cdf7a718cffa3269b2504f4309603a286e1fa9bcba",
+        "blindedReceiverViewingKey": "24981dd5bf2d9491273917df8b461e0bb477557c54947a53c6a9cd00d13ac279",
+        "sharedKey": "87401201e937d5fddff625db3cdad19882780ef5e851d5e5d48011631c6860f1"
+      }
+    ],
+    "invalidPoint": "0200000000000000000000000000000000000000000000000000000000000000"
+  }
+}

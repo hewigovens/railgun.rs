@@ -1,6 +1,9 @@
 //! Field, Poseidon and BabyJubJub primitives matching the Railgun TS engine.
 
+pub mod aes;
 pub mod babyjubjub;
+pub mod ed25519;
+pub mod eddsa;
 pub mod field;
 pub mod poseidon;
 

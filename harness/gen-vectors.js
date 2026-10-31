@@ -156,6 +156,7 @@ const main = async () => {
     'poseidon.json': poseidonVectors(),
     'keys.json': await keyVectors(),
   };
+  Object.assign(files, await require('./m2')(eng, circomlibjs, files['keys.json']));
   fs.mkdirSync(outDir, { recursive: true });
   for (const [name, data] of Object.entries(files)) {
     fs.writeFileSync(path.join(outDir, name), `${JSON.stringify({ meta, data }, null, 2)}\n`);
