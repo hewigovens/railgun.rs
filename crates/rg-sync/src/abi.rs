@@ -4,23 +4,27 @@
 use alloy_sol_types::sol;
 
 sol! {
+    #[derive(Debug, PartialEq, Eq)]
     struct TokenData {
         uint8 tokenType;
         address tokenAddress;
         uint256 tokenSubID;
     }
 
+    #[derive(Debug, PartialEq, Eq)]
     struct CommitmentPreimage {
         bytes32 npk;
         TokenData token;
         uint120 value;
     }
 
+    #[derive(Debug, PartialEq, Eq)]
     struct ShieldCiphertext {
         bytes32[3] encryptedBundle;
         bytes32 shieldKey;
     }
 
+    #[derive(Debug, PartialEq, Eq)]
     struct CommitmentCiphertext {
         bytes32[4] ciphertext;
         bytes32 blindedSenderViewingKey;
@@ -29,22 +33,26 @@ sol! {
         bytes memo;
     }
 
+    #[derive(Debug, PartialEq, Eq)]
     struct G1Point {
         uint256 x;
         uint256 y;
     }
 
+    #[derive(Debug, PartialEq, Eq)]
     struct G2Point {
         uint256[2] x;
         uint256[2] y;
     }
 
+    #[derive(Debug, PartialEq, Eq)]
     struct SnarkProof {
         G1Point a;
         G2Point b;
         G1Point c;
     }
 
+    #[derive(Debug, PartialEq, Eq)]
     struct BoundParams {
         uint16 treeNumber;
         uint72 minGasPrice;
@@ -55,6 +63,7 @@ sol! {
         CommitmentCiphertext[] commitmentCiphertext;
     }
 
+    #[derive(Debug, PartialEq, Eq)]
     struct Transaction {
         SnarkProof proof;
         bytes32 merkleRoot;
@@ -63,6 +72,18 @@ sol! {
         BoundParams boundParams;
         CommitmentPreimage unshieldPreimage;
     }
+
+    #[derive(Debug, PartialEq, Eq)]
+    struct VerifyingKey {
+        string artifactsIPFSHash;
+        G1Point alpha1;
+        G2Point beta2;
+        G2Point gamma2;
+        G2Point delta2;
+        G1Point[] ic;
+    }
+
+    event VerifyingKeySet(uint256 nullifiers, uint256 commitments, VerifyingKey verifyingKey);
 
     event Shield(
         uint256 treeNumber,

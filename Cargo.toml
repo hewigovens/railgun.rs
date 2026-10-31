@@ -7,6 +7,8 @@ members = [
   "crates/rg-tree",
   "crates/rg-sync",
   "crates/rg-wallet",
+  "crates/rg-prover",
+  "crates/rg-tx",
 ]
 
 [workspace.package]
@@ -41,3 +43,15 @@ rg-sync = { path = "crates/rg-sync" }
 alloy-primitives = { version = "1", default-features = false, features = ["std", "serde"] }
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
 alloy-sol-types = { version = "1", default-features = false, features = ["std"] }
+ark-ec = { version = "0.5", default-features = false }
+ark-groth16 = { version = "0.5", default-features = false }
+ark-poly = { version = "0.5", default-features = false }
+ark-relations = { version = "0.5", default-features = false }
+ark-serialize = { version = "0.5", default-features = false }
+ark-std = { version = "0.5", default-features = false }
+rand = "0.8"
+rayon = "1"
+wasmi = "2"
+wasmtime = { version = "50", default-features = false, features = ["cranelift", "runtime", "std"] }
+rg-wallet = { path = "crates/rg-wallet" }
+rg-prover = { path = "crates/rg-prover", default-features = false }

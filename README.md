@@ -24,6 +24,15 @@ through UniFFI. See `scope.md` for the plan and milestones.
   notes, balances). Checked on the full Sepolia history to block 12031295: every root
   a successful `transact` call used is in the rebuilt history, and the TS engine gets
   the same root, TXOs, spends and balances for the same wallet.
+- M4 (not yet on chain): `crates/rg-prover` (circom witness from the circuit wasm on
+  wasmi, or wasmtime with the `wasmtime` feature; snarkjs zkey loading and Groth16
+  proving with arkworks; snarkjs JSON for keys and proofs) and `crates/rg-tx` (note
+  selection, recipient and change outputs, bound params and their hash, the spending
+  signature, circuit inputs, `transact` calldata, the contract's verifying key from its
+  `VerifyingKeySet` event). Against the TS engine with randoms pinned: circuit inputs,
+  bound params and calldata are identical, the witness equals snarkjs's, snarkjs and the
+  Sepolia contract's 1x2 key accept the Rust proof, and the recipient decrypts the note.
+  Submitting is the remaining step.
 
 ## Running the tests
 
@@ -63,6 +72,36 @@ cargo test --release -p rg-wallet -- --ignored   # full-history test, needs data
 `vectors/m3/` holds the first 200 Sepolia logs and the engine's result for them, which
 the default test run checks.
 
+## Proving check (M4)
+
+The circuit artifacts are not committed (no licence on them). The engine repository's
+`src/test/test-artifacts-lite` has brotli-compressed 1x2 artifacts whose key equals the
+one the Sepolia contract set at block 10028485; decompress them into
+`<artifacts>/1x2/{circuit.wasm,circuit.zkey,vkey.json}`.
+
+```
+ARTIFACTS_DIR=<artifacts> HARNESS_NODE_MODULES=/path/to/node_modules \
+  node harness/m4.js vectors/m3/sepolia-head-200.jsonl <mnemonic-file> vectors/m4
+RG_ARTIFACTS_DIR=<artifacts> cargo test --release -p rg-tx -- --ignored
+cargo run --release -p rg-prover --features wasmtime,parallel --example prove_1x2 -- <artifacts>/1x2 vectors/m4/transfer.json
+cargo run --release -p rg-tx --example transfer -- <logs.jsonl> <mnemonic-file> <artifacts> <recipient 0zk> <token> <value> [memo]
+```
+
+`vectors/m4/transfer.json` comes from the throwaway Sepolia test wallet, so the two
+tests that rebuild it from keys read `.test-wallet/sepolia-test-mnemonic.txt` and skip
+when it is missing. The rest run on public data only.
+
+Timings for one 1x2 transfer on this machine (4-core 2.1 GHz Xeon, release):
+
+| step | time |
+| --- | --- |
+| zkey load (6 MB, with curve checks) | 1.15 s |
+| witness, wasmi | 0.36 s |
+| witness, wasmtime | 0.04 to 0.06 s |
+| prove, one thread | 0.60 to 0.76 s |
+| prove, `parallel` (4 threads) | 0.19 s |
+| prove, snarkjs in Node (for comparison) | 1.4 to 1.6 s |
+
 ## Rust to TS check
 
 Rust-made ciphertexts and signatures, with randoms the engine never saw, decrypted and
@@ -93,6 +132,10 @@ HARNESS_NODE_MODULES=/path/to/node_modules node harness/check-rust.js /tmp/rust-
 - `rg_wallet` drops a shield note whose note public key is not
   `poseidon(ourMPK, random)`; the engine keeps any shield whose random decrypts. Such a
   note could not be spent.
+- `rg_tx::plan_transfer` spends one note (1xN circuits). Several inputs, unshields,
+  relay adapt params and broadcaster fees are not done yet.
+- `rg_prover::Circuit::prove` checks the witness length against the zkey's variable
+  count; ark-circom's matrices count one witness variable too many.
 - `rg_sync` handles V2.1 events only (all Sepolia has). Legacy pre-March-2023 events on
   other chains, reorgs and persistent storage are not done yet.
 
@@ -103,4 +146,6 @@ MIT. `crates/rg-primitives/src/poseidon.rs` is a port of codex-storage/rs-poseid
 optimized Poseidon parameters). Vectors in `crates/rg-keys/tests/engine_vectors.rs`
 and `crates/rg-notes/tests/engine_vectors.rs` are copied from the Railgun engine's
 tests (MIT). EdDSA is written from the circomlib scheme; no circomlibjs (GPL-3.0) code
-is ported.
+is ported. `crates/rg-prover/src/zkey.rs` and `qap.rs` are ported from ark-circom
+0.5.0 (MIT OR Apache-2.0, Copyright (c) 2021 Georgios Konstantopoulos); the witness
+calculator follows circom_runtime's calling convention and copies no code from it.

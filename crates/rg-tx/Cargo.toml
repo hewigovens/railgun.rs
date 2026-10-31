@@ -1,0 +1,29 @@
+[package]
+name = "rg-tx"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Railgun private transfers: bound params, signing, circuit inputs and the transact call"
+
+[dependencies]
+alloy-primitives.workspace = true
+alloy-sol-types.workspace = true
+rg-keys.workspace = true
+rg-notes.workspace = true
+rg-primitives.workspace = true
+rg-sync.workspace = true
+rg-tree.workspace = true
+rg-wallet.workspace = true
+thiserror.workspace = true
+tiny-keccak.workspace = true
+rg-prover.workspace = true
+ark-bn254.workspace = true
+ark-ff.workspace = true
+
+[dev-dependencies]
+rg-prover = { workspace = true, features = ["wasmi"] }
+hex.workspace = true
+rand.workspace = true
+serde.workspace = true
+serde_json.workspace = true
