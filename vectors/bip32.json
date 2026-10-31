@@ -1,0 +1,46 @@
+{
+  "meta": {
+    "generator": "harness/gen-vectors.js",
+    "engineVersion": "9.6.0",
+    "seed": "railgun-rust-core-vectors-v1"
+  },
+  "data": {
+    "master": {
+      "seed": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+      "chainKey": "1fafc64161d1807e294cc9fded180ca2009aaaedf4cbd7359d4aaa3bb462f411",
+      "chainCode": "30d550bc2f61a7c206a1eba3704502da77f366fe69721265b3b7e2c7f05eeabc"
+    },
+    "paths": [
+      {
+        "seed": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+        "path": "m/0'",
+        "chainKey": "67d7d19d00e6e3b3517fe68ac46505dd207df6e8fe3aa06ba3face352e7599ef",
+        "chainCode": "e8e6a1bbce8bab145fe8225435dc98d20d53bd32318ce3ede560b8feef3394a5"
+      },
+      {
+        "seed": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+        "path": "m/0'/1'",
+        "chainKey": "3428cfc939320328501174a4e76e869197ffc894b58dbf4d0e953c484d66cb5e",
+        "chainCode": "2a7df111cc59bcca21ca45ba9f5bf2fc3823fc222fc9f7517c4d739de9d60f24"
+      },
+      {
+        "seed": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+        "path": "m/44'/1984'/0'/0'/0'",
+        "chainKey": "08b2d974aa7fffd9d068b78c34434c534ddcd9343fcbf5aa12cf78e1a3c1ccb9",
+        "chainCode": "3ab8fac1fa9cb8643636fb9147f6235a9493fc63f32a469bce8cdd7fa0925ce3"
+      },
+      {
+        "seed": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+        "path": "m/420'/1984'/0'/0'/3'",
+        "chainKey": "589e9af9f9838e47fcc17d6e22909adb7fcb9dcd092506bd899030550bce09ec",
+        "chainCode": "e37699a63446918b889b0f945bcae24d48adb81178e601231763bf1d610b58e7"
+      },
+      {
+        "seed": "5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+        "path": "m/2147483647'",
+        "chainKey": "e8f352fa1aecce84967146e7ff5a113acf7e28ddcf93b267cbbc29f4f8424de7",
+        "chainCode": "2be37fb08b0334048ba08296bac7f1ac620d7cbbd64d798f5c72742fd02d4a44"
+      }
+    ]
+  }
+}
