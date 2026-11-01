@@ -11,7 +11,7 @@ commands. This file is what the cloud session knew that those two don't say.
 | M1 keys, 0zk addresses | done, matches engine vectors |
 | M2 notes, EdDSA, Ed25519 blinding, AES | done, byte-equal to the engine |
 | M3 Sepolia sync, tree, scan | done, matches the engine on all of Sepolia to block 12031295 |
-| M4 prove and submit one transfer | done on Arbitrum; Anon decrypting the note still to confirm |
+| M4 prove and submit one transfer | done on Arbitrum; the Anon wallet received it |
 | M5 POI | not started |
 
 Tests: `cargo test --workspace` gives 52 passed, 2 ignored (the M3 full-history test
@@ -29,11 +29,7 @@ First real transfer: Arbitrum tx
 `0xb4988c76c999a60d702bff903a5f9934504eed945eb34a47466c9426f89f7db2`, block 520397232,
 1,006,352 gas, 0.00025 WETH to the Anon 0zk with the change back to the sender.
 
-## Next step: the on-chain send, on Arbitrum
-
-Testing on Arbitrum mainnet with a small amount: Anon wallet does not offer Sepolia,
-shared-models lists no Arbitrum Sepolia or HyperEVM deployment, and Ethereum costs more
-gas and has 297k leaves to Arbitrum's 133k.
+## Mainnet sync and sending
 
 Mainnets have legacy events `rg_sync` does not decode, so `fetch_leaves` seeds the tree
 with hashes from Railgun's squid and checks the root against the contract; logs take over
@@ -49,9 +45,8 @@ Local state, all gitignored:
   public addresses (sender 0zk, recipient 0zk, EOA)
 - `data/arbitrum-leaves.txt`, `data/arbitrum-logs.jsonl`, `data/artifacts/{1x1,1x2,1x3}`
 
-Blocked on funding: shield a little ETH to the sender 0zk from Anon, and send about
-0.0005 ETH on Arbitrum to the EOA. Then, with `harness` installed
-(`npm install --ignore-scripts`), and `$RECIPIENT` the Anon 0zk:
+To send again, with `harness` installed (`npm install --ignore-scripts`). The sender holds
+0.00025 WETH and the EOA 0.00048 ETH:
 
 ```
 RPC=https://arb1.arbitrum.io/rpc
@@ -118,7 +113,7 @@ in the lite set, so `plan_transfer` spends one note only.
 
 ## Open items
 
-- On-chain send (above), then M5 POI.
+- M5 POI is next.
 - Several inputs (2x2 needs production artifacts from IPFS), unshield, relay adapt,
   broadcaster fees.
 - Decoding legacy (pre-V2.1) events, so older wallets can scan; reorg handling, persistent
