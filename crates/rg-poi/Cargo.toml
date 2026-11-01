@@ -1,0 +1,34 @@
+[package]
+name = "rg-poi"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Private Proof of Innocence: txid tree, blinded commitments, POI circuit inputs and the aggregator client"
+
+[features]
+default = []
+# Blocking JSON-RPC client for the POI aggregator.
+rpc = ["dep:reqwest", "dep:serde_json"]
+
+[dependencies]
+ark-bn254.workspace = true
+hex.workspace = true
+rg-primitives.workspace = true
+rg-tree.workspace = true
+thiserror.workspace = true
+reqwest = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+
+[dev-dependencies]
+rand.workspace = true
+rg-keys.workspace = true
+rg-notes.workspace = true
+rg-prover = { workspace = true, features = ["wasmi"] }
+rg-sync = { workspace = true, features = ["rpc"] }
+rg-wallet.workspace = true
+serde_json.workspace = true
+
+[[example]]
+name = "submit_poi"
+required-features = ["rpc"]

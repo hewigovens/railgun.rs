@@ -9,6 +9,7 @@ members = [
   "crates/rg-wallet",
   "crates/rg-prover",
   "crates/rg-tx",
+  "crates/rg-poi",
 ]
 
 [workspace.package]

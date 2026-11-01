@@ -2985,6 +2985,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "rg-poi"
+version = "0.1.0"
+dependencies = [
+ "ark-bn254",
+ "hex",
+ "rand 0.8.8",
+ "reqwest",
+ "rg-keys",
+ "rg-notes",
+ "rg-primitives",
+ "rg-prover",
+ "rg-sync",
+ "rg-tree",
+ "rg-wallet",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "rg-primitives"
 version = "0.1.0"
 dependencies = [
