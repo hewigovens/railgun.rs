@@ -11,8 +11,8 @@
 use std::sync::LazyLock;
 
 use ark_ff::{Field, One, Zero};
-use blake_hash::{Blake512, Digest};
 
+use crate::blake::blake512;
 use crate::field::{from_decimal, to_le_bytes};
 use crate::{Error, Fr};
 
@@ -206,13 +206,6 @@ pub fn prune(mut buf: [u8; 32]) -> [u8; 32] {
     buf[31] &= 0x7f;
     buf[31] |= 0x40;
     buf
-}
-
-/// Blake-512 (original BLAKE, as circomlib's `blake-hash` package) of the key.
-pub fn blake512(data: &[u8]) -> [u8; 64] {
-    let mut out = [0u8; 64];
-    out.copy_from_slice(&Blake512::digest(data));
-    out
 }
 
 /// circomlib `eddsa.prv2pub`: `Base8 * (prune(blake512(prv)[0..32]) >> 3)`.

@@ -10,7 +10,8 @@
 use ark_ed_on_bn254::Fr as SubgroupScalar;
 use ark_ff::{BigInteger, PrimeField};
 
-use crate::babyjubjub::{blake512, prune, shr3_le, Point, BASE8};
+use crate::babyjubjub::{prune, shr3_le, Point, BASE8};
+use crate::blake::blake512;
 use crate::field::to_le_bytes;
 use crate::{poseidon, Fr};
 

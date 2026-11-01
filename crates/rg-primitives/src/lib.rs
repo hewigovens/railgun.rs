@@ -2,6 +2,7 @@
 
 pub mod aes;
 pub mod babyjubjub;
+pub mod blake;
 pub mod ed25519;
 pub mod eddsa;
 pub mod field;
