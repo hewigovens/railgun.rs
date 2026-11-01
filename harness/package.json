@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@railgun-community/engine": "9.6.0",
-    "memdown": "^6.1.1"
+    "memdown": "^6.1.1",
+    "snarkjs": "0.7.6"
   }
 }
