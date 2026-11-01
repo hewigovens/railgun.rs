@@ -11,7 +11,7 @@ commands. This file is what the cloud session knew that those two don't say.
 | M1 keys, 0zk addresses | done, matches engine vectors |
 | M2 notes, EdDSA, Ed25519 blinding, AES | done, byte-equal to the engine |
 | M3 Sepolia sync, tree, scan | done, matches the engine on all of Sepolia to block 12031295 |
-| M4 prove and submit one transfer | everything but the on-chain send |
+| M4 prove and submit one transfer | done on Arbitrum; Anon decrypting the note still to confirm |
 | M5 POI | not started |
 
 Tests: `cargo test --workspace` gives 52 passed, 2 ignored (the M3 full-history test
@@ -25,7 +25,9 @@ M4 checks that pass, against engine 9.6.0 with randoms pinned:
 - recipient decrypts the Rust-built note; change comes back to the sender
 - `crates/rg-tx/examples/transfer.rs` runs the whole path in Rust
 
-Not checked: the contract accepting a real transfer, and Railway decrypting it.
+First real transfer: Arbitrum tx
+`0xb4988c76c999a60d702bff903a5f9934504eed945eb34a47466c9426f89f7db2`, block 520397232,
+1,006,352 gas, 0.00025 WETH to the Anon 0zk with the change back to the sender.
 
 ## Next step: the on-chain send, on Arbitrum
 
