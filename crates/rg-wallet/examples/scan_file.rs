@@ -1,6 +1,6 @@
 //! Sync from a JSONL file of proxy logs and scan one wallet.
 //!
-//! cargo run --release -p rg-wallet --example scan_file -- <logs.jsonl> <mnemonic-file> [index]
+//! cargo run --release -p rg-wallet --example scan_file -- <logs.jsonl> <mnemonic-file> [index] [seed leaves]
 //!
 //! Prints JSON: event counts, per-tree leaf counts and roots, and the
 //! wallet's TXOs, sent notes and balances.
@@ -23,6 +23,11 @@ fn main() {
 
     let t0 = std::time::Instant::now();
     let mut state = SyncState::new();
+    if let Some(seed) = args.get(4) {
+        state
+            .seed_from_text(&std::fs::read_to_string(seed).unwrap())
+            .unwrap();
+    }
     state.apply_all(&logs).unwrap();
     let sync_ms = t0.elapsed().as_millis();
 

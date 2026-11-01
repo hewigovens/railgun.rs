@@ -84,7 +84,7 @@ ARTIFACTS_DIR=<artifacts> HARNESS_NODE_MODULES=/path/to/node_modules \
   node harness/m4.js vectors/m3/sepolia-head-200.jsonl <mnemonic-file> vectors/m4
 RG_ARTIFACTS_DIR=<artifacts> cargo test --release -p rg-tx -- --ignored
 cargo run --release -p rg-prover --features wasmtime,parallel --example prove_1x2 -- <artifacts>/1x2 vectors/m4/transfer.json
-cargo run --release -p rg-tx --example transfer -- <logs.jsonl> <mnemonic-file> <artifacts> <recipient 0zk> <token> <value> [memo]
+cargo run --release -p rg-tx --example transfer -- <network> <seed or -> <logs.jsonl> <mnemonic-file> <artifacts> <recipient 0zk> <token> <value> [memo]
 ```
 
 `vectors/m4/transfer.json` comes from the throwaway Sepolia test wallet, so the two
@@ -136,8 +136,10 @@ HARNESS_NODE_MODULES=/path/to/node_modules node harness/check-rust.js /tmp/rust-
   relay adapt params and broadcaster fees are not done yet.
 - `rg_prover::Circuit::prove` checks the witness length against the zkey's variable
   count; ark-circom's matrices count one witness variable too many.
-- `rg_sync` handles V2.1 events only (all Sepolia has). Legacy pre-March-2023 events on
-  other chains, reorgs and persistent storage are not done yet.
+- `rg_sync` decodes V2.1 events only (all Sepolia has). On mainnets, pre-March-2023
+  leaves are seeded by hash from the squid (`fetch_leaves`, root checked against the
+  contract), so a wallet with notes before the seed cannot be scanned yet. Reorgs and
+  persistent storage are not done yet.
 
 ## Licensing
 

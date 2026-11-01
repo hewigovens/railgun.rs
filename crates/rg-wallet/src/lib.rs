@@ -168,6 +168,7 @@ impl Scanner {
                 );
                 out.txos.push(txo);
             }
+            Commitment::Opaque(_) => {}
             Commitment::Transact(t) => {
                 if let Ok(n) = decrypt_as_receiver(&self.viewing, &t.ciphertext) {
                     if n.commitment() == leaf_hash {

@@ -26,3 +26,7 @@ reqwest = { workspace = true, optional = true }
 [[example]]
 name = "fetch_logs"
 required-features = ["rpc"]
+
+[[example]]
+name = "fetch_leaves"
+required-features = ["rpc"]

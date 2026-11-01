@@ -14,7 +14,7 @@ commands. This file is what the cloud session knew that those two don't say.
 | M4 prove and submit one transfer | everything but the on-chain send |
 | M5 POI | not started |
 
-Tests: `cargo test --workspace` gives 50 passed, 2 ignored (the M3 full-history test
+Tests: `cargo test --workspace` gives 52 passed, 2 ignored (the M3 full-history test
 needs `data/`, the M4 witness and proof test needs circuit artifacts). Two of the 48
 skip quietly without `.test-wallet/sepolia-test-mnemonic.txt`.
 
@@ -27,38 +27,44 @@ M4 checks that pass, against engine 9.6.0 with randoms pinned:
 
 Not checked: the contract accepting a real transfer, and Railway decrypting it.
 
-## Next step: the on-chain send
+## Next step: the on-chain send, on Arbitrum
 
-Stays on Sepolia: shared-models lists no Arbitrum Sepolia or HyperEVM deployment, and the
-Rust side can now shield by itself. Local state, all gitignored:
+Testing on Arbitrum mainnet with a small amount: Anon wallet does not offer Sepolia,
+shared-models lists no Arbitrum Sepolia or HyperEVM deployment, and Ethereum costs more
+gas and has 297k leaves to Arbitrum's 133k.
+
+Mainnets have legacy events `rg_sync` does not decode, so `fetch_leaves` seeds the tree
+with hashes from Railgun's squid and checks the root against the contract; logs take over
+from the block it prints. A wallet's notes must all come after that block, which holds
+for the fresh wallets here. Checked: the lite 1x1, 1x2 and 1x3 keys equal Arbitrum's
+on-chain keys, and seed plus live logs reproduced `merkleRoot()` exactly (1,946 leaves in
+tree 2, a real V2.1 shield included). Shield fee is 0.25%.
+
+Local state, all gitignored:
 
 - `.test-wallet/test-mnemonic.txt` sender wallet, `recipient-mnemonic.txt` second wallet,
-  `sepolia-eoa.key` gas account, `addresses.txt` their public addresses (0zk sender,
-  0zk recipient, EOA)
-- `data/sepolia-logs.jsonl` proxy logs, `data/artifacts/{1x1,1x2,1x3}`
+  `sepolia-eoa.key` gas account (an EOA, valid on any chain), `addresses.txt` their
+  public addresses (sender 0zk, recipient 0zk, EOA)
+- `data/arbitrum-leaves.txt`, `data/arbitrum-logs.jsonl`, `data/artifacts/{1x1,1x2,1x3}`
 
-Blocked on funding: the EOA needs about 0.02 Sepolia ETH. A shield of 0.01 ETH passed an
-`eth_call` against the live proxy with WETH balance and allowance overridden, and reverted
-without them. Then, with `harness` installed (`npm install --ignore-scripts`):
+Blocked on funding: shield a little ETH to the sender 0zk from Anon, and send about
+0.0005 ETH on Arbitrum to the EOA. Then, with `harness` installed
+(`npm install --ignore-scripts`), and `$RECIPIENT` the Anon 0zk:
 
 ```
-RPC=https://ethereum-sepolia-rpc.publicnode.com
-SENDER=$(sed -n 1p .test-wallet/addresses.txt); RECIPIENT=$(sed -n 2p .test-wallet/addresses.txt)
-WETH=0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14
-cargo run --release -p rg-tx --example shield -- $SENDER 10000000000000000 > .test-wallet/shield.jsonl
-node harness/send.js send $RPC .test-wallet/sepolia-eoa.key .test-wallet/shield.jsonl
-cargo run --release -p rg-sync --features rpc --example fetch_logs -- $RPC data/sepolia-logs.jsonl
-cargo run --release -p rg-tx --example transfer -- data/sepolia-logs.jsonl .test-wallet/test-mnemonic.txt \
-  data/artifacts $RECIPIENT $WETH 5000000000000000 > .test-wallet/transfer.json
+RPC=https://arb1.arbitrum.io/rpc
+WETH=0x82aF49447D8a07e3bd95BD0d56f35241523fBab1
+cargo run --release -p rg-sync --features rpc --example fetch_logs -- arbitrum $RPC data/arbitrum-logs.jsonl
+cargo run --release -p rg-wallet --example scan_file -- data/arbitrum-logs.jsonl .test-wallet/test-mnemonic.txt 0 data/arbitrum-leaves.txt
+cargo run --release -p rg-tx --example transfer -- arbitrum data/arbitrum-leaves.txt data/arbitrum-logs.jsonl \
+  .test-wallet/test-mnemonic.txt data/artifacts $RECIPIENT $WETH <value> > .test-wallet/transfer.json
 python3 -c "import json;d=json.load(open('.test-wallet/transfer.json'));print(json.dumps({'label':'transact','to':d['to'],'value':'0','data':d['data']}))" > .test-wallet/transfer.jsonl
 node harness/send.js send $RPC .test-wallet/sepolia-eoa.key .test-wallet/transfer.jsonl
-cargo run --release -p rg-sync --features rpc --example fetch_logs -- $RPC data/sepolia-logs.jsonl
-cargo run --release -p rg-wallet --example scan_file -- data/sepolia-logs.jsonl .test-wallet/recipient-mnemonic.txt
 ```
 
-Afterwards, send to your Railway 0zk the same way to close the "Railway decrypts" check.
-Expect Railway to hold it as pending until POI (M5). publicnode serves `eth_getLogs` in
-ranges up to 50,000 blocks, which is what `fetch_logs` uses.
+ethers estimates gas before sending, so a transaction the contract would reject fails
+without spending anything. Expect the recipient wallet to hold the funds as pending until
+POI (M5). The `shield` example also takes a network if a wallet-free shield is wanted.
 
 ## Circuit artifacts
 
@@ -113,5 +119,6 @@ in the lite set, so `plan_transfer` spends one note only.
 - On-chain send (above), then M5 POI.
 - Several inputs (2x2 needs production artifacts from IPFS), unshield, relay adapt,
   broadcaster fees.
-- Legacy (pre-V2.1) events for mainnet chains, reorg handling, persistent storage.
+- Decoding legacy (pre-V2.1) events, so older wallets can scan; reorg handling, persistent
+  storage.
 - UniFFI bindings; device timings on iPhone, Mac and Android.

@@ -8,8 +8,11 @@
 pub mod abi;
 pub mod events;
 pub mod log;
+pub mod network;
 #[cfg(feature = "rpc")]
 pub mod rpc;
+#[cfg(feature = "rpc")]
+pub mod squid;
 pub mod state;
 
 pub use events::{
@@ -17,11 +20,8 @@ pub use events::{
     TransactionRoot,
 };
 pub use log::RawLog;
+pub use network::Network;
 pub use state::{Commitment, Leaf, NullifierRecord, SyncState};
-
-/// Sepolia RailgunSmartWallet proxy and its deployment block.
-pub const SEPOLIA_PROXY: &str = "0xeCFCf3b4eC647c4Ca6D49108b311b7a7C9543fea";
-pub const SEPOLIA_DEPLOYMENT_BLOCK: u64 = 5_784_866;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {

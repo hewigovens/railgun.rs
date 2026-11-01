@@ -3,35 +3,43 @@
 //! sent: broadcasting is a separate step.
 //!
 //! cargo run --release -p rg-tx --example transfer -- \
-//!   <logs.jsonl> <mnemonic-file> <artifacts dir> <recipient 0zk> <token address> <value> [memo]
+//!   <network> <seed leaves or -> <logs.jsonl> <mnemonic-file> <artifacts dir> \
+//!   <recipient 0zk> <token address> <value> [memo]
 //!
-//! The artifacts dir holds `<n>x<m>/circuit.wasm`, `circuit.zkey`; the proof
-//! is checked against the key the Sepolia contract set (vectors/m4).
+//! The artifacts dir holds `<n>x<m>/circuit.wasm`, `circuit.zkey`. On Sepolia
+//! the proof is also checked against the key the contract set (vectors/m4).
+//! The seed comes from the fetch_leaves example, for chains with legacy events.
 
 use std::time::Instant;
 
 use alloy_sol_types::SolEvent;
 use rand::RngCore;
 use rg_keys::{decode_address, WalletKeys};
-use rg_sync::{abi, RawLog, SyncState};
+use rg_sync::{abi, Network, RawLog, SyncState};
 use rg_tx::*;
 use rg_wallet::Scanner;
 
 fn main() {
     let a: Vec<String> = std::env::args().collect();
-    let logs = RawLog::parse_jsonl(&std::fs::read_to_string(&a[1]).unwrap()).unwrap();
-    let mnemonic = std::fs::read_to_string(&a[2]).unwrap();
-    let artifacts = std::path::Path::new(&a[3]);
-    let recipient = decode_address(&a[4]).unwrap();
-    let token: [u8; 20] = hex::decode(a[5].trim_start_matches("0x"))
+    let network = Network::by_name(&a[1]).expect("unknown network");
+    let logs = RawLog::parse_jsonl(&std::fs::read_to_string(&a[3]).unwrap()).unwrap();
+    let mnemonic = std::fs::read_to_string(&a[4]).unwrap();
+    let artifacts = std::path::Path::new(&a[5]);
+    let recipient = decode_address(&a[6]).unwrap();
+    let token: [u8; 20] = hex::decode(a[7].trim_start_matches("0x"))
         .unwrap()
         .try_into()
         .unwrap();
-    let value: u128 = a[6].parse().unwrap();
-    let memo = a.get(7).map(String::as_str);
+    let value: u128 = a[8].parse().unwrap();
+    let memo = a.get(9).map(String::as_str);
 
     let t = Instant::now();
     let mut state = SyncState::new();
+    if a[2] != "-" {
+        state
+            .seed_from_text(&std::fs::read_to_string(&a[2]).unwrap())
+            .unwrap();
+    }
     state.apply_all(&logs).unwrap();
     let keys = WalletKeys::from_mnemonic(mnemonic.trim(), "", 0).unwrap();
     let scan = Scanner::new(keys.clone()).scan(&state);
@@ -44,7 +52,7 @@ fn main() {
         memo_text: memo,
         show_sender_to_recipient: false,
         wallet_source: "rgrustcore",
-        chain_id: chain_full_network_id(0, 11_155_111),
+        chain_id: chain_full_network_id(0, network.chain_id),
         min_gas_price: 0,
     };
     let mut rng = rand::rngs::OsRng;
@@ -72,7 +80,7 @@ fn main() {
     assert_eq!(public, prepared.public_inputs());
     assert!(rg_prover::verify(&circuit.pk.vk, &public, &proof).unwrap());
 
-    if shape == "1x2" {
+    if shape == "1x2" && network.chain_id == Network::SEPOLIA.chain_id {
         let path = concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../vectors/m4/sepolia-vkey-1x2.json"
@@ -90,8 +98,8 @@ fn main() {
     println!(
         "{}",
         serde_json::json!({
-            "to": rg_sync::SEPOLIA_PROXY,
-            "chainId": 11155111,
+            "to": network.proxy,
+            "chainId": network.chain_id,
             "value": "0",
             "data": format!("0x{}", hex::encode(calldata)),
             "merkleRoot": format!("{}", fr_to_b256(&prepared.merkle_root)),
