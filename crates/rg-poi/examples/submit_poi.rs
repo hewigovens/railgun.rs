@@ -194,6 +194,11 @@ fn main() {
     };
 
     let dir = std::path::Path::new(&a[5]);
+    let n = if a[5].ends_with("13x13") {
+        rg_poi::FULL_CIRCUIT
+    } else {
+        rg_poi::MINI_CIRCUIT
+    };
     let wasm = std::fs::read(dir.join("circuit.wasm")).unwrap();
     let circuit =
         rg_prover::Circuit::from_zkey(&std::fs::read(dir.join("circuit.zkey")).unwrap()).unwrap();
@@ -202,15 +207,19 @@ fn main() {
         .unwrap()
         .calculator()
         .unwrap()
-        .calculate(&inputs.circuit_inputs().unwrap())
+        .calculate(&inputs.circuit_inputs(n).unwrap())
         .unwrap();
     eprintln!("witness: {:?}", t.elapsed());
     let t = std::time::Instant::now();
     let (proof, public) = circuit.prove(&witness, &mut OsRng).unwrap();
     eprintln!("prove: {:?}", t.elapsed());
-    assert_eq!(public, inputs.public_inputs(&blinded_out), "public signals");
+    assert_eq!(
+        public,
+        inputs.public_inputs(n, &blinded_out),
+        "public signals"
+    );
     assert!(rg_prover::verify(&circuit.pk.vk, &public, &proof).unwrap());
-    println!("proof verifies against the POI 3x3 key");
+    println!("proof verifies against the POI key");
 
     let p = rg_prover::proof_to_json(&proof);
     let s = |v: &serde_json::Value| v.as_str().unwrap().to_string();

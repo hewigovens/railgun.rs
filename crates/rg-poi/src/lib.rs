@@ -14,14 +14,15 @@ pub mod node;
 
 /// The txid hash pads to 13 no matter which POI circuit proves it.
 const TXID_MAX_ITEMS: usize = 13;
-pub const CIRCUIT_INPUTS: usize = 3;
-pub const CIRCUIT_OUTPUTS: usize = 3;
+/// POI circuits take n inputs and n outputs: 3 or 13.
+pub const MINI_CIRCUIT: usize = 3;
+pub const FULL_CIRCUIT: usize = 13;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("tree: {0}")]
     Tree(#[from] rg_tree::Error),
-    #[error("{0} inputs and {1} outputs need the 13x13 circuit")]
+    #[error("{0} inputs and {1} outputs do not fit this circuit")]
     TooLarge(usize, usize),
     #[error("{0} of {1} inputs have a POI merkle proof")]
     ProofCount(usize, usize),
@@ -173,11 +174,11 @@ fn pad(values: Vec<Fr>, len: usize, with: Fr) -> Vec<Fr> {
 }
 
 impl ProofInputs {
-    /// The 3x3 circuit's input signals (`Prover.formatPOIInputs`). Empty slots
-    /// hold the Merkle zero, except values and POI indices, which hold 0.
-    pub fn circuit_inputs(&self) -> Result<Vec<(String, Vec<Fr>)>, Error> {
+    /// Input signals for an n x n circuit (`Prover.formatPOIInputs`). Empty
+    /// slots hold the Merkle zero, except values and POI indices, which hold 0.
+    pub fn circuit_inputs(&self, n: usize) -> Result<Vec<(String, Vec<Fr>)>, Error> {
         let (ins, outs) = (self.nullifiers.len(), self.commitments_out.len());
-        if ins > CIRCUIT_INPUTS || outs > CIRCUIT_OUTPUTS {
+        if ins > n || outs > n {
             return Err(Error::TooLarge(ins, outs));
         }
         if self.list_proofs.len() != ins {
@@ -189,11 +190,11 @@ impl ProofInputs {
         let zero = zero_value();
         let none = Fr::from(0u64);
         let fr = |v: u128| Fr::from(v);
-        let mut path_elements = Vec::with_capacity(CIRCUIT_INPUTS * TREE_DEPTH);
+        let mut path_elements = Vec::with_capacity(n * TREE_DEPTH);
         for p in &self.list_proofs {
             path_elements.extend_from_slice(&p.elements);
         }
-        path_elements.resize(CIRCUIT_INPUTS * TREE_DEPTH, zero);
+        path_elements.resize(n * TREE_DEPTH, zero);
 
         let spent = |f: &dyn Fn(&SpentNote) -> Fr| self.spent.iter().map(f).collect::<Vec<_>>();
         let out = |f: &dyn Fn(&OutputNote) -> Fr| self.outputs.iter().map(f).collect::<Vec<_>>();
@@ -207,32 +208,20 @@ impl ProofInputs {
                 vec![self.txid_proof.root],
             ),
             signal("boundParamsHash", vec![self.bound_params_hash]),
-            signal(
-                "nullifiers",
-                pad(self.nullifiers.clone(), CIRCUIT_INPUTS, zero),
-            ),
-            signal(
-                "commitmentsOut",
-                pad(self.commitments_out.clone(), CIRCUIT_OUTPUTS, zero),
-            ),
+            signal("nullifiers", pad(self.nullifiers.clone(), n, zero)),
+            signal("commitmentsOut", pad(self.commitments_out.clone(), n, zero)),
             signal("spendingPublicKey", self.spending_public_key.to_vec()),
             signal("nullifyingKey", vec![self.nullifying_key]),
             signal("token", vec![self.token_hash]),
-            signal("randomsIn", pad(spent(&|s| s.random), CIRCUIT_INPUTS, zero)),
-            signal(
-                "valuesIn",
-                pad(spent(&|s| fr(s.value)), CIRCUIT_OUTPUTS, none),
-            ),
+            signal("randomsIn", pad(spent(&|s| s.random), n, zero)),
+            signal("valuesIn", pad(spent(&|s| fr(s.value)), n, none)),
             signal(
                 "utxoPositionsIn",
-                pad(spent(&|s| Fr::from(s.position)), CIRCUIT_INPUTS, zero),
+                pad(spent(&|s| Fr::from(s.position)), n, zero),
             ),
             signal("utxoTreeIn", vec![Fr::from(self.utxo_tree_in)]),
-            signal("npksOut", pad(out(&|o| o.npk), CIRCUIT_OUTPUTS, zero)),
-            signal(
-                "valuesOut",
-                pad(out(&|o| fr(o.value)), CIRCUIT_OUTPUTS, none),
-            ),
+            signal("npksOut", pad(out(&|o| o.npk), n, zero)),
+            signal("valuesOut", pad(out(&|o| fr(o.value)), n, none)),
             signal(
                 "utxoBatchGlobalStartPositionOut",
                 vec![Fr::from(self.global_position_out)],
@@ -246,26 +235,23 @@ impl ProofInputs {
                 "railgunTxidMerkleProofPathElements",
                 self.txid_proof.elements.to_vec(),
             ),
-            signal(
-                "poiMerkleroots",
-                pad(list(&|p| p.root), CIRCUIT_INPUTS, zero),
-            ),
+            signal("poiMerkleroots", pad(list(&|p| p.root), n, zero)),
             signal(
                 "poiInMerkleProofIndices",
-                pad(list(&|p| p.indices), CIRCUIT_INPUTS, none),
+                pad(list(&|p| p.indices), n, none),
             ),
             signal("poiInMerkleProofPathElements", path_elements),
         ])
     }
 
     /// Public signals the circuit should produce, given the blinded commitments.
-    pub fn public_inputs(&self, blinded_out: &[Fr]) -> Vec<Fr> {
+    pub fn public_inputs(&self, n: usize, blinded_out: &[Fr]) -> Vec<Fr> {
         let zero = zero_value();
-        let mut out = pad(blinded_out.to_vec(), CIRCUIT_OUTPUTS, Fr::from(0u64));
+        let mut out = pad(blinded_out.to_vec(), n, Fr::from(0u64));
         out.push(self.txid_proof.root);
         out.push(Fr::from(0u64));
         let roots = self.list_proofs.iter().map(|p| p.root).collect();
-        out.extend(pad(roots, CIRCUIT_INPUTS, zero));
+        out.extend(pad(roots, n, zero));
         out
     }
 }

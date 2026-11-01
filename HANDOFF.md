@@ -12,9 +12,9 @@ commands. This file is what the cloud session knew that those two don't say.
 | M2 notes, EdDSA, Ed25519 blinding, AES | done, byte-equal to the engine |
 | M3 Sepolia sync, tree, scan | done, matches the engine on all of Sepolia to block 12031295 |
 | M4 prove and submit one transfer | done on Arbitrum; the Anon wallet received it |
-| M5 POI | not started |
+| M5 POI | proving works; the aggregator has not accepted a proof yet |
 
-Tests: `cargo test --workspace` gives 52 passed, 2 ignored (the M3 full-history test
+Tests: `cargo test --workspace` gives 55 passed, 2 ignored (the M3 full-history test
 needs `data/`, the M4 witness and proof test needs circuit artifacts). Two of the 48
 skip quietly without `.test-wallet/sepolia-test-mnemonic.txt`.
 
@@ -62,6 +62,30 @@ node harness/send.js send $RPC .test-wallet/sepolia-eoa.key .test-wallet/transfe
 ethers estimates gas before sending, so a transaction the contract would reject fails
 without spending anything. Expect the recipient wallet to hold the funds as pending until
 POI (M5). The `shield` example also takes a network if a wallet-free shield is wanted.
+
+## M5 state
+
+`crates/rg-poi` and its `submit_poi` example, run on the Arbitrum transfer (seed, logs and
+`data/artifacts/poi-3x3` or `poi-13x13`, decompressed from the engine's lite `poi/` folder;
+both vkeys equal the production IPFS ones).
+
+Works: the txid tree from the squid equals the aggregator's validated root (71,318
+transactions), the input note is `Valid` on list `efc6ddb5...`, the proof verifies
+against the key, and engine 9.6.0 and 9.0.1 (the node's pinned version) with snarkjs both
+verify it through `getPublicInputsPOI` and `verifyPOIProof`.
+
+Blocked: `ppoi.fdi.network` answers `Invalid proof` to `ppoi_submit_transact_proof`. It did
+so for arkworks 3x3, arkworks 13x13 and a snarkjs 3x3 proof of the same inputs, so this is
+not the Rust prover. `--single` (`ppoi_submit_single_commitment_proofs`) returns success,
+but this node only forwards to the list provider and swallows errors from it, and after
+minutes the outputs stay `Missing` with no queue or event change. Those requests are not
+checked against `POIValidation.assertIsValidSpendableTXID` locally yet.
+
+Other Arbitrum senders do reach `Valid`: 50 of the last 60 unshields, including one-off
+senders. Their txs all have unshields, ours does not. Ideas, in order: import the sender
+mnemonic into Railway and see whether it gets the same outputs to `Valid`; validate the
+single-commitment data with the engine; try a transfer with an unshield; ask the Railgun
+maintainers what the deployed node runs (the public repo stops at February 2025).
 
 ## Circuit artifacts
 
@@ -113,7 +137,7 @@ in the lite set, so `plan_transfer` spends one note only.
 
 ## Open items
 
-- M5 POI is next.
+- M5: get a POI proof accepted (below).
 - Several inputs (2x2 needs production artifacts from IPFS), unshield, relay adapt,
   broadcaster fees.
 - Decoding legacy (pre-V2.1) events, so older wallets can scan; reorg handling, persistent
