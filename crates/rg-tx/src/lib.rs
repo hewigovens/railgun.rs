@@ -22,6 +22,9 @@ use rg_sync::abi;
 use rg_tree::{MerkleProof, TREE_DEPTH};
 use tiny_keccak::{Hasher, Keccak};
 
+mod shield;
+pub use shield::shield_calldata;
+
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("note: {0}")]

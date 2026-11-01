@@ -25,6 +25,12 @@ sol! {
     }
 
     #[derive(Debug, PartialEq, Eq)]
+    struct ShieldRequest {
+        CommitmentPreimage preimage;
+        ShieldCiphertext ciphertext;
+    }
+
+    #[derive(Debug, PartialEq, Eq)]
     struct CommitmentCiphertext {
         bytes32[4] ciphertext;
         bytes32 blindedSenderViewingKey;
@@ -103,6 +109,8 @@ sol! {
     event Nullified(uint16 treeNumber, bytes32[] nullifier);
 
     event Unshield(address to, TokenData token, uint256 amount, uint256 fee);
+
+    function shield(ShieldRequest[] _shieldRequests) external payable;
 
     function transact(Transaction[] _transactions) external payable;
 

@@ -22,3 +22,7 @@ serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 reqwest = { workspace = true, optional = true }
+
+[[example]]
+name = "fetch_logs"
+required-features = ["rpc"]

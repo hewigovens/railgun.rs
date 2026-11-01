@@ -14,7 +14,7 @@ commands. This file is what the cloud session knew that those two don't say.
 | M4 prove and submit one transfer | everything but the on-chain send |
 | M5 POI | not started |
 
-Tests: `cargo test --workspace` gives 48 passed, 2 ignored (the M3 full-history test
+Tests: `cargo test --workspace` gives 50 passed, 2 ignored (the M3 full-history test
 needs `data/`, the M4 witness and proof test needs circuit artifacts). Two of the 48
 skip quietly without `.test-wallet/sepolia-test-mnemonic.txt`.
 
@@ -29,26 +29,36 @@ Not checked: the contract accepting a real transfer, and Railway decrypting it.
 
 ## Next step: the on-chain send
 
-Nothing has been shielded to any test wallet yet. Plan:
+Stays on Sepolia: shared-models lists no Arbitrum Sepolia or HyperEVM deployment, and the
+Rust side can now shield by itself. Local state, all gitignored:
 
-1. Make a fresh test wallet locally (the cloud one's mnemonic stays in the cloud folder,
-   and it holds nothing):
-   `cargo run -p rg-keys --example new_wallet -- .test-wallet/test-mnemonic.txt`
-   It refuses to overwrite and prints the 0zk address. `.test-wallet/` is gitignored.
-2. Shield a little testnet ETH (wrapped to WETH) to that 0zk address. Anon wallet
-   offers Arbitrum Sepolia and HyperEVM testnet. Sepolia itself is what all the code and
-   vectors target. Arbitrum or HyperEVM testnet needs, first:
-   - the Railgun proxy address and deployment block on that chain (not looked up yet)
-   - a check that its events are V2.1 (`rg_sync` decodes nothing older) and that its
-     `VerifyingKeySet` 1x2 key matches the lite artifacts, as Sepolia's does
-   - the chain id in `TransferRequest.chain_id` (`chain_full_network_id(0, id)`)
-3. Fetch the proxy's logs from the deployment block (JSONL, one `eth_getLogs` object per
-   line), run `examples/transfer.rs` with your wallet, recipient 0zk, token and value.
-   It prints `{to, data}` for the proxy; any funded account can send it (self-signed,
-   no broadcaster). From the cloud there was no RPC (proxy refused every public
-   Sepolia endpoint), which is why this stopped here.
-4. Use your Railway 0zk as the recipient to close the "Railway decrypts" check. Expect
-   Railway to hold it as pending until POI (M5).
+- `.test-wallet/test-mnemonic.txt` sender wallet, `recipient-mnemonic.txt` second wallet,
+  `sepolia-eoa.key` gas account, `addresses.txt` their public addresses (0zk sender,
+  0zk recipient, EOA)
+- `data/sepolia-logs.jsonl` proxy logs, `data/artifacts/{1x1,1x2,1x3}`
+
+Blocked on funding: the EOA needs about 0.02 Sepolia ETH. A shield of 0.01 ETH passed an
+`eth_call` against the live proxy with WETH balance and allowance overridden, and reverted
+without them. Then, with `harness` installed (`npm install --ignore-scripts`):
+
+```
+RPC=https://ethereum-sepolia-rpc.publicnode.com
+SENDER=$(sed -n 1p .test-wallet/addresses.txt); RECIPIENT=$(sed -n 2p .test-wallet/addresses.txt)
+WETH=0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14
+cargo run --release -p rg-tx --example shield -- $SENDER 10000000000000000 > .test-wallet/shield.jsonl
+node harness/send.js send $RPC .test-wallet/sepolia-eoa.key .test-wallet/shield.jsonl
+cargo run --release -p rg-sync --features rpc --example fetch_logs -- $RPC data/sepolia-logs.jsonl
+cargo run --release -p rg-tx --example transfer -- data/sepolia-logs.jsonl .test-wallet/test-mnemonic.txt \
+  data/artifacts $RECIPIENT $WETH 5000000000000000 > .test-wallet/transfer.json
+python3 -c "import json;d=json.load(open('.test-wallet/transfer.json'));print(json.dumps({'label':'transact','to':d['to'],'value':'0','data':d['data']}))" > .test-wallet/transfer.jsonl
+node harness/send.js send $RPC .test-wallet/sepolia-eoa.key .test-wallet/transfer.jsonl
+cargo run --release -p rg-sync --features rpc --example fetch_logs -- $RPC data/sepolia-logs.jsonl
+cargo run --release -p rg-wallet --example scan_file -- data/sepolia-logs.jsonl .test-wallet/recipient-mnemonic.txt
+```
+
+Afterwards, send to your Railway 0zk the same way to close the "Railway decrypts" check.
+Expect Railway to hold it as pending until POI (M5). publicnode serves `eth_getLogs` in
+ranges up to 50,000 blocks, which is what `fetch_logs` uses.
 
 ## Circuit artifacts
 
@@ -67,6 +77,9 @@ in the lite set, so `plan_transfer` spends one note only.
 
 ## Things learned the hard way
 
+- The `blake-hash` crate panics on aarch64 (ppv-lite86's generic backend leaves
+  `shuffle1230` unimplemented), which the x86 cloud machine never hit. `rg_primitives::blake`
+  replaces it.
 - ark-circom's zkey matrices report one witness variable too many; `Circuit::prove`
   checks the witness length against `pk.a_query.len()` instead.
 - ark-circom 0.6 pulls ark 0.6, wasmer and ethers-core, so `zkey.rs` and `qap.rs` were

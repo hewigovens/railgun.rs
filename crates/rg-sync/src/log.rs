@@ -66,6 +66,18 @@ impl RawLog {
         })
     }
 
+    /// The `eth_getLogs` shape that `from_json` reads.
+    pub fn to_json(&self) -> serde_json::Value {
+        serde_json::json!({
+            "address": format!("0x{}", hex::encode(self.address)),
+            "topics": self.topics.iter().map(|t| format!("0x{}", hex::encode(t))).collect::<Vec<_>>(),
+            "data": format!("0x{}", hex::encode(&self.data)),
+            "blockNumber": format!("{:#x}", self.block_number),
+            "transactionHash": format!("0x{}", hex::encode(self.transaction_hash)),
+            "logIndex": format!("{:#x}", self.log_index),
+        })
+    }
+
     /// One JSON log per line.
     pub fn parse_jsonl(text: &str) -> Result<Vec<Self>, Error> {
         text.lines()
