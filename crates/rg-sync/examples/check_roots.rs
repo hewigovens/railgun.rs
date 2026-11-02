@@ -1,12 +1,9 @@
-//! Replays proxy logs and checks that every root a successful `transact` call
-//! proved against was already in the rebuilt root history before that call's
-//! block. The contract rejects unknown roots, so every root in a successful
-//! call is a real historical root.
+//! Replays proxy logs and checks that every root a successful `transact` call proved against was already in the rebuilt root history before that call's block. The contract rejects unknown roots, so every root in a successful call is a real historical root.
 //!
 //! cargo run --release -p rg-sync --example check_roots -- <logs.jsonl> <calls.json>
 //! calls.json: [{"hash", "blockNumber", "input"}], as Etherscan's txlist gives them.
 
-use rg_sync::{decode_transact_call, RawLog, SyncState};
+use rg_sync::{RawLog, SyncState, decode_transact_call};
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();

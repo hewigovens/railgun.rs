@@ -1,6 +1,4 @@
-//! Print, as JSONL, the three calls that shield `value` wei of the base token
-//! into a 0zk address as its wrapped token: wrap, approve the proxy, shield.
-//! Nothing is sent; harness/send.js can send them.
+//! Print, as JSONL, the three calls that shield `value` wei of the base token into a 0zk address as its wrapped token: wrap, approve the proxy, shield. Nothing is sent; harness/send.js can send them.
 //!
 //! cargo run --release -p rg-tx --example shield -- <network> <recipient 0zk> <value in wei>
 

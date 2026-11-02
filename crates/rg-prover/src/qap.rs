@@ -1,20 +1,15 @@
 // Ported from ark-circom 0.5.0 (src/circom/qap.rs),
 // https://github.com/arkworks-rs/circom-compat, Copyright (c) 2021 Georgios
-// Konstantopoulos, licensed MIT OR Apache-2.0. Only change: the rayon import
-// for the parallel feature.
+// Konstantopoulos, licensed MIT OR Apache-2.0. Only change: the rayon import for the parallel feature.
 use ark_ff::PrimeField;
-use ark_groth16::r1cs_to_qap::{evaluate_constraint, LibsnarkReduction, R1CSToQAP};
+use ark_groth16::r1cs_to_qap::{LibsnarkReduction, R1CSToQAP, evaluate_constraint};
 use ark_poly::EvaluationDomain;
 use ark_relations::r1cs::{ConstraintMatrices, ConstraintSystemRef, SynthesisError};
 use ark_std::{cfg_into_iter, cfg_iter, cfg_iter_mut, vec};
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 
-/// Implements the witness map used by snarkjs. The arkworks witness map calculates the
-/// coefficients of H through computing (AB-C)/Z in the evaluation domain and going back to the
-/// coefficients domain. snarkjs instead precomputes the Lagrange form of the powers of tau bases
-/// in a domain twice as large and the witness map is computed as the odd coefficients of (AB-C)
-/// in that domain. This serves as HZ when computing the C proof element.
+/// Implements the witness map used by snarkjs. The arkworks witness map calculates the coefficients of H through computing (AB-C)/Z in the evaluation domain and going back to the coefficients domain. snarkjs instead precomputes the Lagrange form of the powers of tau bases in a domain twice as large and the witness map is computed as the odd coefficients of (AB-C) in that domain. This serves as HZ when computing the C proof element.
 pub struct CircomReduction;
 
 impl R1CSToQAP for CircomReduction {

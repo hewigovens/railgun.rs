@@ -1,6 +1,4 @@
-//! EdDSA over BabyJubJub with Poseidon, as circomlib `signPoseidon` and
-//! `verifyPoseidon`, which the Railgun circuits check. Written from the
-//! circomlib scheme, not ported from the GPL circomlibjs code.
+//! EdDSA over BabyJubJub with Poseidon, as circomlib `signPoseidon` and `verifyPoseidon`, which the Railgun circuits check. Written from the circomlib scheme, not ported from the GPL circomlibjs code.
 //!
 //! sign(prv, msg):
 //!   h = blake512(prv); s = prune(h[0..32]) as LE integer; A = Base8 * (s >> 3)
@@ -10,10 +8,10 @@
 use ark_ed_on_bn254::Fr as SubgroupScalar;
 use ark_ff::{BigInteger, PrimeField};
 
-use crate::babyjubjub::{prune, shr3_le, Point, BASE8};
+use crate::babyjubjub::{BASE8, Point, prune, shr3_le};
 use crate::blake::blake512;
 use crate::field::to_le_bytes;
-use crate::{poseidon, Fr};
+use crate::{Fr, poseidon};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Signature {
@@ -23,8 +21,7 @@ pub struct Signature {
 }
 
 impl Signature {
-    /// Builds a signature from S given as a BN254 field element, which is how
-    /// circuit inputs carry it. Fails when S is not below l.
+    /// Builds a signature from S given as a BN254 field element, which is how circuit inputs carry it. Fails when S is not below l.
     pub fn new(r8: Point, s: Fr) -> Option<Self> {
         let big = s.into_bigint();
         if big >= SubgroupScalar::MODULUS {
@@ -73,8 +70,7 @@ pub fn sign(private_key: &[u8; 32], message: &Fr) -> Signature {
     }
 }
 
-/// circomlib `verifyPoseidon`: both points on the curve, S below l (enforced
-/// by the type), and Base8 * S == R8 + A * (8 * hm) with hm as a full integer.
+/// circomlib `verifyPoseidon`: both points on the curve, S below l (enforced by the type), and Base8 * S == R8 + A * (8 * hm) with hm as a full integer.
 pub fn verify(message: &Fr, signature: &Signature, public_key: &Point) -> bool {
     if !signature.r8.is_on_curve() || !public_key.is_on_curve() {
         return false;

@@ -1,9 +1,6 @@
 //! BLAKE-512 (the SHA-3 finalist, not BLAKE2), which circomlib's EdDSA uses.
 //!
-//! Written here because the `blake-hash` crate panics on aarch64: its 64-bit
-//! rounds call `shuffle1230`, which ppv-lite86's generic backend leaves
-//! `unimplemented!()`. Every Apple device is aarch64. Only the unsalted form is
-//! needed, so the salt words are left out.
+//! Written here because the `blake-hash` crate panics on aarch64: its 64-bit rounds call `shuffle1230`, which ppv-lite86's generic backend leaves `unimplemented!()`. Every Apple device is aarch64. Only the unsalted form is needed, so the salt words are left out.
 
 const IV: [u64; 8] = [
     0x6a09_e667_f3bc_c908,
@@ -62,8 +59,7 @@ const STEPS: [[usize; 4]; 8] = [
     [3, 4, 9, 14],
 ];
 
-/// `t` is the count of message bits hashed through this block, or 0 for a
-/// block that holds only padding.
+/// `t` is the count of message bits hashed through this block, or 0 for a block that holds only padding.
 fn compress(h: &mut [u64; 8], block: &[u8], t: u128) {
     let mut m = [0u64; 16];
     for (word, bytes) in m.iter_mut().zip(block.as_chunks::<8>().0) {

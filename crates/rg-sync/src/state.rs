@@ -2,20 +2,18 @@
 
 use std::collections::{HashMap, HashSet};
 
-use rg_primitives::{field, Fr};
+use rg_primitives::{Fr, field};
 use rg_tree::MerkleTree;
 
-use crate::events::{decode_log, RailgunEvent, ShieldCommitment, TransactCommitment};
-use crate::log::RawLog;
 use crate::Error;
+use crate::events::{RailgunEvent, ShieldCommitment, TransactCommitment, decode_log};
+use crate::log::RawLog;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Commitment {
     Shield(ShieldCommitment),
     Transact(TransactCommitment),
-    /// A leaf seeded from an indexer: its hash and nothing else. Mainnets have
-    /// pre-2023 events this crate does not decode; a wallet created after the
-    /// seed owns none of these leaves, so it only needs them for the tree.
+    /// A leaf seeded from an indexer: its hash and nothing else. Mainnets have pre-2023 events this crate does not decode; a wallet created after the seed owns none of these leaves, so it only needs them for the tree.
     Opaque([u8; 32]),
 }
 
@@ -49,8 +47,7 @@ pub struct SyncState {
     pub leaves: Vec<Vec<Leaf>>,
     /// Keyed by (tree, nullifier).
     pub nullifiers: HashMap<(u16, [u8; 32]), NullifierRecord>,
-    /// Every root a tree has had after an insertion, as the contract's
-    /// `rootHistory` records them. Includes each empty tree's root.
+    /// Every root a tree has had after an insertion, as the contract's `rootHistory` records them. Includes each empty tree's root.
     pub root_history: HashSet<(u32, [u8; 32])>,
     /// Number of each tracked event applied, for reporting.
     pub counts: EventCounts,
@@ -109,8 +106,7 @@ impl SyncState {
         Ok(())
     }
 
-    /// Inserts hash-only leaves. Check the resulting root against the contract
-    /// before trusting it: nothing here proves that the indexer told the truth.
+    /// Inserts hash-only leaves. Check the resulting root against the contract before trusting it: nothing here proves that the indexer told the truth.
     pub fn seed(&mut self, tree: u32, start: u32, hashes: &[[u8; 32]]) -> Result<(), Error> {
         let leaves = hashes
             .iter()
@@ -163,15 +159,15 @@ impl SyncState {
     /// Applies one log. Logs must arrive in (block, log index) order.
     pub fn apply(&mut self, log: &RawLog) -> Result<(), Error> {
         let key = (log.block_number, log.log_index);
-        if let Some(last) = self.last {
-            if key <= last {
-                return Err(Error::OutOfOrder {
-                    block: key.0,
-                    index: key.1,
-                    last_block: last.0,
-                    last_index: last.1,
-                });
-            }
+        if let Some(last) = self.last
+            && key <= last
+        {
+            return Err(Error::OutOfOrder {
+                block: key.0,
+                index: key.1,
+                last_block: last.0,
+                last_index: last.1,
+            });
         }
         let leaf = |commitment| Leaf {
             commitment,

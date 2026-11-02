@@ -2,8 +2,7 @@
 //!
 //! cargo run --release -p rg-wallet --example scan_file -- <logs.jsonl> <mnemonic-file> [index] [seed leaves]
 //!
-//! Prints JSON: event counts, per-tree leaf counts and roots, and the
-//! wallet's TXOs, sent notes and balances.
+//! Prints JSON: event counts, per-tree leaf counts and roots, and the wallet's TXOs, sent notes and balances.
 
 use rg_keys::WalletKeys;
 use rg_primitives::field;

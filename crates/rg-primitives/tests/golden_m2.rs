@@ -1,11 +1,11 @@
 //! M2 primitives against harness vectors and the engine's own keys-utils test.
 
 use ark_ff::PrimeField;
-use rg_primitives::babyjubjub::{private_to_public, Point};
-use rg_primitives::ed25519::{blind_keys, private_scalar, public_key, shared_key, unblind_key};
-use rg_primitives::eddsa::{sign, verify, Signature};
-use rg_primitives::field::{from_decimal, to_decimal};
 use rg_primitives::Fr;
+use rg_primitives::babyjubjub::{Point, private_to_public};
+use rg_primitives::ed25519::{blind_keys, private_scalar, public_key, shared_key, unblind_key};
+use rg_primitives::eddsa::{Signature, sign, verify};
+use rg_primitives::field::{from_decimal, to_decimal};
 use serde::Deserialize;
 
 #[derive(Deserialize)]

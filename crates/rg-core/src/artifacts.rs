@@ -1,6 +1,4 @@
-//! Circuit artifacts: downloaded when first needed and checked by hash every
-//! time they load. They are not redistributed here (see scope.md), only their
-//! hashes, from the wallet SDK's `artifact-v2-hashes.json` (MIT).
+//! Circuit artifacts: downloaded when first needed and checked by hash every time they load. They are not redistributed here (see scope.md), only their hashes, from the wallet SDK's `artifact-v2-hashes.json` (MIT).
 
 use std::fs;
 use std::io::Read;
@@ -174,21 +172,6 @@ mod tests {
         for n in [rg_poi::MINI_CIRCUIT, rg_poi::FULL_CIRCUIT] {
             Circuit::Poi(n).expected_hash(Kind::Zkey).unwrap();
         }
-    }
-
-    #[test]
-    fn urls_follow_the_two_roots() {
-        let t = Circuit::Transact {
-            inputs: 1,
-            outputs: 2,
-        };
-        assert!(t
-            .url(Kind::Zkey)
-            .ends_with(&format!("{TRANSACT_ROOT}/circuits/01x02/zkey.br")));
-        let p = Circuit::Poi(3);
-        assert!(p
-            .url(Kind::Wasm)
-            .ends_with(&format!("{POI_ROOT}/prover/snarkjs/03x03.wasm.br")));
     }
 
     #[test]

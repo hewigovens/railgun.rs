@@ -1,5 +1,4 @@
-//! Circom 2 witness calculator: runs the circuit's wasm and reads the witness
-//! back, following circom_runtime's WitnessCalculatorCircom2.
+//! Circom 2 witness calculator: runs the circuit's wasm and reads the witness back, following circom_runtime's WitnessCalculatorCircom2.
 
 use ark_bn254::Fr;
 use ark_ff::{BigInteger, PrimeField};

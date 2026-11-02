@@ -1,25 +1,20 @@
-//! V2 transact note ciphertexts (`note/transact-note.ts` encryptV2/decrypt and
-//! the output loop in `transaction/transaction.ts`).
+//! V2 transact note ciphertexts (`note/transact-note.ts` encryptV2/decrypt and the output loop in `transaction/transaction.ts`).
 //!
-//! Plaintext, one AES-256-GCM stream with a 16-byte IV: encodedMPK(32),
-//! tokenHash(32), random(16) || value(16, big-endian), then the memo text.
-//! The first three blocks go into `ciphertext[1..4]` with `iv || tag` in
-//! `ciphertext[0]`; the memo's ciphertext travels separately.
+//! Plaintext, one AES-256-GCM stream with a 16-byte IV: encodedMPK(32), tokenHash(32), random(16) || value(16, big-endian), then the memo text. The first three blocks go into `ciphertext[1..4]` with `iv || tag` in `ciphertext[0]`; the memo's ciphertext travels separately.
 
 use ark_ff::PrimeField;
+use rg_primitives::Fr;
 use rg_primitives::aes::{decrypt_gcm, encrypt_gcm};
 use rg_primitives::ed25519::{blind_keys, shared_key, unblind_key};
 use rg_primitives::field::{from_be_bytes_mod_order, to_be_bytes};
-use rg_primitives::Fr;
 
 use crate::memo::{decode_text, decrypt_annotation, encode_text, encrypt_annotation_v2};
-use crate::{note, AnnotationData, Error, OutputType};
+use crate::{AnnotationData, Error, OutputType, note};
 
 /// The sender random of a note whose sender address is visible to the receiver.
 pub const SENDER_RANDOM_NULL: [u8; 15] = [0; 15];
 
-/// The receiver sees the sender's MPK when the sender random is null: the note
-/// then carries receiverMPK XOR senderMPK instead of receiverMPK.
+/// The receiver sees the sender's MPK when the sender random is null: the note then carries receiverMPK XOR senderMPK instead of receiverMPK.
 pub fn encode_master_public_key(
     receiver_master_public_key: &Fr,
     sender_master_public_key: &Fr,
@@ -146,8 +141,7 @@ impl OutputNote<'_> {
 }
 
 /// Builds one output's ciphertext the way the engine's transaction does:
-/// blind both viewing keys, ECDH with the blinded receiver key, encrypt the
-/// note, and encrypt annotation data for the sender.
+/// blind both viewing keys, ECDH with the blinded receiver key, encrypt the note, and encrypt annotation data for the sender.
 pub fn create_commitment_ciphertext_v2(
     sender: &ViewingKeys,
     note: &OutputNote,
@@ -194,8 +188,7 @@ pub fn create_commitment_ciphertext_v2(
     })
 }
 
-/// A decrypted note. Viewing public keys are none where the engine leaves a
-/// dummy empty key (unblinding impossible or not attempted).
+/// A decrypted note. Viewing public keys are none where the engine leaves a dummy empty key (unblinding impossible or not attempted).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DecryptedNote {
     pub receiver_master_public_key: Fr,
@@ -236,8 +229,7 @@ pub fn decrypt_as_receiver(
         .ok_or(Error::InvalidPoint)?;
     let p = decrypt_note_v2(&key, &note_ciphertext(c))?;
     let own = to_be_bytes(&wallet.master_public_key);
-    // The engine compares integers; an encoded MPK equal to ours means the
-    // sender hid their address.
+    // The engine compares integers; an encoded MPK equal to ours means the sender hid their address.
     let sender_visible = p.encoded_master_public_key != own;
     let (sender_mpk, sender_vpk) = if sender_visible {
         (

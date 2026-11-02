@@ -1,5 +1,4 @@
-//! Event and call layouts from the engine's `abi/V2.1/RailgunSmartWallet.json`
-//! (an interface description, used here only for its types).
+//! Event and call layouts from the engine's `abi/V2.1/RailgunSmartWallet.json` (an interface description, used here only for its types).
 
 use alloy_sol_types::sol;
 

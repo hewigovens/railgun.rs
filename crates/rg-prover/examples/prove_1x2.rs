@@ -5,7 +5,7 @@
 
 use std::time::Instant;
 
-use rg_prover::{parse_fr, proof_from_json, proof_to_json, verify, vkey_from_json, Circuit};
+use rg_prover::{Circuit, parse_fr, proof_from_json, proof_to_json, verify, vkey_from_json};
 use serde_json::Value;
 
 fn main() {

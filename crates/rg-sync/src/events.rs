@@ -1,16 +1,15 @@
-//! Decoded RailgunSmartWallet events (V2.1, the only format on Sepolia; the
-//! legacy pre-March-2023 events of other chains are not handled yet).
+//! Decoded RailgunSmartWallet events (V2.1, the only format on Sepolia; the legacy pre-March-2023 events of other chains are not handled yet).
 
 use alloy_primitives::U256;
 use alloy_sol_types::{SolCall, SolEvent};
 use rg_notes::shield::ShieldCiphertext;
 use rg_notes::transact::CommitmentCiphertextV2;
 use rg_notes::{TokenData, TokenType};
-use rg_primitives::{field, Fr};
+use rg_primitives::{Fr, field};
 
+use crate::Error;
 use crate::abi;
 use crate::log::RawLog;
-use crate::Error;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ShieldCommitment {
@@ -179,8 +178,7 @@ pub struct TransactionRoot {
     pub root: [u8; 32],
 }
 
-/// Decodes `transact(Transaction[])` calldata into the roots it uses.
-/// Returns none when the input is not a `transact` call.
+/// Decodes `transact(Transaction[])` calldata into the roots it uses. Returns none when the input is not a `transact` call.
 pub fn decode_transact_call(input: &[u8]) -> Result<Option<Vec<TransactionRoot>>, Error> {
     if input.len() < 4 || input[..4] != abi::transactCall::SELECTOR {
         return Ok(None);

@@ -1,5 +1,4 @@
-//! A log as `eth_getLogs` returns it. Etherscan's logs API uses the same field
-//! names (plus some extras, ignored here) but writes index 0 as `"0x"`.
+//! A log as `eth_getLogs` returns it. Etherscan's logs API uses the same field names (plus some extras, ignored here) but writes index 0 as `"0x"`.
 
 use serde::Deserialize;
 

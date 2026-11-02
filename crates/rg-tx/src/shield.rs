@@ -1,6 +1,6 @@
 //! Calldata to shield an ERC20 into a 0zk address.
 
-use alloy_primitives::{Address, FixedBytes, B256, U256};
+use alloy_primitives::{Address, B256, FixedBytes, U256};
 use alloy_sol_types::SolCall;
 use rg_keys::AddressData;
 use rg_notes::note::note_public_key;
@@ -10,11 +10,9 @@ use rg_sync::abi;
 
 use crate::Error;
 
-/// `proxy.shield([...])` for `value` of `token`, payable to `receiver`. The
-/// caller must have approved the proxy for `value`. `fill` supplies randomness.
+/// `proxy.shield([...])` for `value` of `token`, payable to `receiver`. The caller must have approved the proxy for `value`. `fill` supplies randomness.
 ///
-/// The SDK derives the shield key from a wallet signature so the shielder can
-/// find its own shield later. The receiver does not need it, so here it is random.
+/// The SDK derives the shield key from a wallet signature so the shielder can find its own shield later. The receiver does not need it, so here it is random.
 pub fn shield_calldata(
     receiver: &AddressData,
     token: [u8; 20],

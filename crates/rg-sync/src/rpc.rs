@@ -1,13 +1,12 @@
-//! Minimal blocking JSON-RPC client: `eth_blockNumber`, `eth_getLogs` in
-//! block chunks, and `rootHistory(tree, root)` via `eth_call`.
+//! Minimal blocking JSON-RPC client: `eth_blockNumber`, `eth_getLogs` in block chunks, and `rootHistory(tree, root)` via `eth_call`.
 
 use alloy_primitives::{B256, U256};
 use alloy_sol_types::SolCall;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
+use crate::Error;
 use crate::abi;
 use crate::log::RawLog;
-use crate::Error;
 
 pub struct RpcClient {
     url: String,
@@ -39,8 +38,7 @@ impl RpcClient {
             .ok_or_else(|| Error::Rpc("missing result".into()))
     }
 
-    /// Runs a call against the node, as the sender would. A transaction the
-    /// contract would reject comes back as an error, at no cost.
+    /// Runs a call against the node, as the sender would. A transaction the contract would reject comes back as an error, at no cost.
     pub fn estimate_gas(&self, from: &str, to: &str, data: &str) -> Result<u64, Error> {
         let v = self.call(
             "eth_estimateGas",
@@ -60,8 +58,7 @@ impl RpcClient {
         u64::from_str_radix(s.trim_start_matches("0x"), 16).map_err(|e| Error::Rpc(e.to_string()))
     }
 
-    /// Logs of `address` in `[from, to]`, fetched `chunk` blocks at a time,
-    /// sorted by (block, log index).
+    /// Logs of `address` in `[from, to]`, fetched `chunk` blocks at a time, sorted by (block, log index).
     pub fn get_logs(
         &self,
         address: &str,

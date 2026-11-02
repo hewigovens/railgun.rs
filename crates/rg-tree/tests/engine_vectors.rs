@@ -1,7 +1,7 @@
 //! Vectors from the engine's `merkletree/__tests__/utxo-merkletree.test.ts` (MIT).
 
-use rg_primitives::{field, Fr};
-use rg_tree::{hash_left_right, zero_value, zeros, MerkleTree, TREE_DEPTH};
+use rg_primitives::{Fr, field};
+use rg_tree::{MerkleTree, TREE_DEPTH, hash_left_right, zero_value, zeros};
 
 fn fr(h: &str) -> Fr {
     let b = hex::decode(format!("{h:0>64}")).unwrap();

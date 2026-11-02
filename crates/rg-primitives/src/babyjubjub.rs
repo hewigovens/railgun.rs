@@ -1,12 +1,6 @@
-//! BabyJubJub in circomlib's twisted Edwards form (a = 168700, d = 168696)
-//! and circomlib's key derivation. Note `ark-ed-on-bn254` uses the
-//! isomorphic a = 1 form, whose coordinates differ, so it is not used here.
+//! BabyJubJub in circomlib's twisted Edwards form (a = 168700, d = 168696) and circomlib's key derivation. Note `ark-ed-on-bn254` uses the isomorphic a = 1 form, whose coordinates differ, so it is not used here.
 //!
-//! Two scalar multiplications: `mul_le` (double-and-add, variable time, for
-//! public scalars) and `mul_ct` (fixed-sequence Montgomery ladder in projective
-//! coordinates, for secret scalars). The ladder runs the same field operations
-//! for every scalar; arkworks' field arithmetic itself is not audited for
-//! constant time.
+//! Two scalar multiplications: `mul_le` (double-and-add, variable time, for public scalars) and `mul_ct` (fixed-sequence Montgomery ladder in projective coordinates, for secret scalars). The ladder runs the same field operations for every scalar; arkworks' field arithmetic itself is not audited for constant time.
 
 use std::sync::LazyLock;
 
@@ -70,9 +64,7 @@ impl Point {
         acc
     }
 
-    /// Montgomery ladder over all 256 bits of a little-endian scalar, with
-    /// branchless swaps and complete projective addition, for secret scalars.
-    /// Same result as `mul_le` for any scalar.
+    /// Montgomery ladder over all 256 bits of a little-endian scalar, with branchless swaps and complete projective addition, for secret scalars. Same result as `mul_le` for any scalar.
     pub fn mul_ct(&self, scalar_le: &[u8; 32]) -> Point {
         let mut r0 = Projective::identity();
         let mut r1 = Projective::from_affine(self);
@@ -116,8 +108,7 @@ impl Point {
         let mut x = (num * den.inverse().ok_or(Error::InvalidPoint)?)
             .sqrt()
             .ok_or(Error::InvalidPoint)?;
-        // Match circomlib: take the root as returned, negate when the sign bit is set.
-        // ffjavascript's sqrt returns the "positive" root.
+        // Match circomlib: take the root as returned, negate when the sign bit is set. ffjavascript's sqrt returns the "positive" root.
         if is_negative(&x) {
             x = -x;
         }
@@ -180,8 +171,7 @@ impl Projective {
         q.z -= dz;
     }
 
-    /// Inverts Z by Fermat (fixed exponent) rather than the variable-time
-    /// extended Euclid behind `Field::inverse`.
+    /// Inverts Z by Fermat (fixed exponent) rather than the variable-time extended Euclid behind `Field::inverse`.
     fn to_affine(self) -> Point {
         use ark_ff::{BigInteger, PrimeField};
         let mut exp = Fr::MODULUS;

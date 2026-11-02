@@ -2,9 +2,9 @@
 
 use std::collections::BTreeMap;
 
-use rg_primitives::{field, Fr};
+use rg_primitives::{Fr, field};
 use rg_tree::TREE_DEPTH;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::ListProof;
 

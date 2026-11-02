@@ -2,7 +2,7 @@
 
 use rg_keys::bip32::KeyNode;
 use rg_keys::keys::mnemonic_to_seed;
-use rg_keys::{decode_address, encode_address, AddressData, Chain, WalletKeys};
+use rg_keys::{AddressData, Chain, WalletKeys, decode_address, encode_address};
 use rg_primitives::field::to_decimal;
 use serde::Deserialize;
 

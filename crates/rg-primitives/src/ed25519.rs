@@ -1,13 +1,11 @@
-//! Ed25519 pieces of Railgun note encryption: viewing-key ECDH and the
-//! blinding of sender and receiver viewing keys (`utils/keys-utils.ts`).
+//! Ed25519 pieces of Railgun note encryption: viewing-key ECDH and the blinding of sender and receiver viewing keys (`utils/keys-utils.ts`).
 
 use curve25519_dalek::constants::ED25519_BASEPOINT_TABLE;
 use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
 use curve25519_dalek::scalar::Scalar;
 use sha2::{Digest, Sha256, Sha512};
 
-/// `getPrivateScalarFromPrivateKey`: clamped sha512(prv)[0..32], little-endian,
-/// mod l. The engine maps 0 to l, which is the same point multiple.
+/// `getPrivateScalarFromPrivateKey`: clamped sha512(prv)[0..32], little-endian, mod l. The engine maps 0 to l, which is the same point multiple.
 pub fn private_scalar(private_key: &[u8; 32]) -> Scalar {
     let h = Sha512::digest(private_key);
     let mut head = [0u8; 32];
@@ -25,18 +23,14 @@ pub fn public_key(private_key: &[u8; 32]) -> [u8; 32] {
         .to_bytes()
 }
 
-/// `getSharedSymmetricKey`: sha256 of the compressed point `pub * scalar(prv)`.
-/// None when `public_key` is not a curve point. Like the engine's wasm path
-/// (curve25519-dalek), a non-canonical y encoding is accepted.
+/// `getSharedSymmetricKey`: sha256 of the compressed point `pub * scalar(prv)`. None when `public_key` is not a curve point. Like the engine's wasm path (curve25519-dalek), a non-canonical y encoding is accepted.
 pub fn shared_key(private_key: &[u8; 32], public_key: &[u8; 32]) -> Option<[u8; 32]> {
     let point = CompressedEdwardsY(*public_key).decompress()?;
     let shared = (point * private_scalar(private_key)).compress();
     Some(Sha256::digest(shared.as_bytes()).into())
 }
 
-/// `getBlindingScalar`: the note random (16 bytes) and sender random (15 bytes)
-/// XORed as big-endian integers, written as 32 bytes, then sha512 of that read
-/// big-endian mod l.
+/// `getBlindingScalar`: the note random (16 bytes) and sender random (15 bytes) XORed as big-endian integers, written as 32 bytes, then sha512 of that read big-endian mod l.
 pub fn blinding_scalar(random: &[u8; 16], sender_random: &[u8; 15]) -> Scalar {
     let mut seed = [0u8; 32];
     seed[16..].copy_from_slice(random);
@@ -51,8 +45,7 @@ pub fn blinding_scalar(random: &[u8; 16], sender_random: &[u8; 15]) -> Scalar {
     Scalar::from_bytes_mod_order_wide(&wide)
 }
 
-/// Decodes like noble-ed25519's strict `Point.fromHex`, which the engine uses
-/// for blinding: y must be below p.
+/// Decodes like noble-ed25519's strict `Point.fromHex`, which the engine uses for blinding: y must be below p.
 fn decode_strict(bytes: &[u8; 32]) -> Option<EdwardsPoint> {
     const P_LE: [u8; 32] = {
         let mut p = [0xffu8; 32];

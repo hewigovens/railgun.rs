@@ -1,7 +1,7 @@
 # Handoff (2026-11-02)
 
-Read `scope.md` for the plan, `docs/architecture.md` for the design and `README.md` for
-commands. This file is what those two
+Read `AGENTS.md` for conventions, `scope.md` for the plan, `docs/architecture.md` for the
+design and `README.md` for commands. This file is what those two
 don't say.
 
 ## Where it stands
@@ -16,7 +16,7 @@ don't say.
 | M5 POI | done on Arbitrum: a Rust proof reached `Valid`, Anon shows the funds spendable |
 | Unshield, several inputs | done on Arbitrum, each with POI `Valid` |
 
-Tests: `cargo test --workspace` gives 68 passed, 2 ignored (the M3 full-history test
+Tests: `cargo test --workspace` gives 66 passed, 2 ignored (the M3 full-history test
 needs Sepolia `data/`, the M4 witness and proof test needs circuit artifacts). Two tests
 skip quietly without `.test-wallet/sepolia-test-mnemonic.txt`.
 

@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use rg_sync::{decode_log, decode_transact_call, Error, RailgunEvent, RawLog, SyncState};
+use rg_sync::{Error, RailgunEvent, RawLog, SyncState, decode_log, decode_transact_call};
 
 fn vectors() -> std::path::PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../vectors/m3")

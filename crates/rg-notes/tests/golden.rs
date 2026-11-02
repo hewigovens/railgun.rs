@@ -4,13 +4,13 @@ use rg_notes::memo::{decode_text, decrypt_annotation, encode_text, encrypt_annot
 use rg_notes::note::{commitment, note_public_key, nullifier};
 use rg_notes::shield::{decrypt_as_receiver as shield_decrypt, encrypt_shield};
 use rg_notes::transact::{
-    create_commitment_ciphertext_v2, decrypt_as_receiver, decrypt_as_sender, DecryptedNote,
-    OutputNote, ViewingKeys,
+    DecryptedNote, OutputNote, ViewingKeys, create_commitment_ciphertext_v2, decrypt_as_receiver,
+    decrypt_as_sender,
 };
-use rg_notes::{wallet_source, OutputType, TokenData, TokenType};
+use rg_notes::{OutputType, TokenData, TokenType, wallet_source};
+use rg_primitives::Fr;
 use rg_primitives::ed25519::shared_key;
 use rg_primitives::field::{from_decimal, to_be_bytes, to_decimal};
-use rg_primitives::Fr;
 use serde::Deserialize;
 
 #[derive(Deserialize)]

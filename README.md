@@ -45,10 +45,13 @@ through UniFFI. See `scope.md` for the plan and milestones, and
 ## Running the tests
 
 ```
-CARGO_TARGET_DIR=/some/dir/outside/this/folder cargo test
+just test-rust <crate> [filter]
+just test
+just lint
 ```
 
-Keep the target directory out of a synced folder; it gets large.
+`AGENTS.md` has the code conventions. Keep the target directory out of a synced folder;
+it gets large.
 
 ## Regenerating vectors
 

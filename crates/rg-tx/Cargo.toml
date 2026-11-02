@@ -2,6 +2,7 @@
 name = "rg-tx"
 version = "0.1.0"
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
 description = "Railgun private transfers: bound params, signing, circuit inputs and the transact call"
@@ -27,3 +28,6 @@ hex.workspace = true
 rand.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+
+[lints]
+workspace = true

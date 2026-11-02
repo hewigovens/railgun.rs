@@ -1,11 +1,11 @@
 use rand::RngCore;
-use rg_keys::{decode_address, WalletKeys};
+use rg_keys::{WalletKeys, decode_address};
 use rg_primitives::Fr;
-use rg_prover::ark_types::{Bn254, Proof};
 use rg_prover::Circuit;
+use rg_prover::ark_types::{Bn254, Proof};
 use rg_tx::{
-    chain_full_network_id, plan_transfer, plan_unshield, prepare, transact_calldata,
-    TransferParams, TransferRequest, UnshieldRequest,
+    TransferParams, TransferRequest, UnshieldRequest, chain_full_network_id, plan_transfer,
+    plan_unshield, transact_calldata,
 };
 
 use crate::{Artifacts, ChainStore, Client, Error};
@@ -20,8 +20,7 @@ pub struct Transfer<'a> {
     pub memo: Option<&'a str>,
 }
 
-/// Out of the pool to a public address. The contract keeps its fee, so `to`
-/// receives slightly less than `value`.
+/// Out of the pool to a public address. The contract keeps its fee, so `to` receives slightly less than `value`.
 pub struct Unshield {
     pub to: [u8; 20],
     pub token: [u8; 20],
@@ -114,7 +113,7 @@ impl<S: ChainStore> Client<S> {
         params: &TransferParams,
         artifacts: &Artifacts,
     ) -> Result<UnsignedTx, Error> {
-        let prepared = prepare(keys, params)?;
+        let prepared = params.prepare(keys)?;
         let circuit = crate::Circuit::Transact {
             inputs: prepared.nullifiers.len(),
             outputs: prepared.commitments.len(),

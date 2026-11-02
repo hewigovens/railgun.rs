@@ -2,14 +2,14 @@ use std::collections::BTreeMap;
 
 use rg_keys::WalletKeys;
 use rg_notes::note::note_public_key;
-use rg_poi::node::{blinded_hex, Node, AGGREGATOR, REQUIRED_LIST};
+use rg_poi::node::{AGGREGATOR, Node, REQUIRED_LIST, blinded_hex};
 use rg_poi::{
-    blinded_commitment, global_tree_position, railgun_txid, txid_leaf, OutputNote, ProofInputs,
-    SpentNote, TxidTrees, FULL_CIRCUIT, MINI_CIRCUIT,
+    FULL_CIRCUIT, MINI_CIRCUIT, OutputNote, ProofInputs, SpentNote, TxidTrees, blinded_commitment,
+    global_tree_position, railgun_txid, txid_leaf,
 };
-use rg_primitives::{field, Fr};
-use rg_sync::squid::{fetch_transactions, SquidTransaction};
-use serde_json::{json, Value};
+use rg_primitives::{Fr, field};
+use rg_sync::squid::{SquidTransaction, fetch_transactions};
+use serde_json::{Value, json};
 
 use crate::transfer::prove;
 use crate::{Artifacts, ChainStore, Circuit, Client, Error};
@@ -60,9 +60,7 @@ impl<S: ChainStore> Client<S> {
         Node::new(AGGREGATOR, self.network.chain_id)
     }
 
-    /// Proves POI for a transaction this wallet sent, on the smallest circuit
-    /// that fits. The wallet must be synced past the transaction, and every
-    /// note it spent must already be in the list.
+    /// Proves POI for a transaction this wallet sent, on the smallest circuit that fits. The wallet must be synced past the transaction, and every note it spent must already be in the list.
     pub fn prove_poi(
         &self,
         keys: &WalletKeys,
@@ -72,9 +70,7 @@ impl<S: ChainStore> Client<S> {
         self.prove_poi_on(keys, tx_hash, artifacts, None)
     }
 
-    /// `prove_poi` with the circuit size forced, as the engine's
-    /// `provePOIForInputsOutputs` allows. Both sizes are valid for a small
-    /// transaction.
+    /// `prove_poi` with the circuit size forced, as the engine's `provePOIForInputsOutputs` allows. Both sizes are valid for a small transaction.
     pub fn prove_poi_on(
         &self,
         keys: &WalletKeys,

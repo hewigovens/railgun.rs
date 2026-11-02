@@ -1,14 +1,12 @@
-//! Leaf hashes from Railgun's Subsquid indexer, which also covers the legacy
-//! events `decode_log` does not read.
+//! Leaf hashes from Railgun's Subsquid indexer, which also covers the legacy events `decode_log` does not read.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::Error;
 
 const PAGE: usize = 10_000;
 
-/// A Railgun transaction as the squid records it, legacy ones included. Their
-/// order by id is the order of the txid tree.
+/// A Railgun transaction as the squid records it, legacy ones included. Their order by id is the order of the txid tree.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SquidTransaction {
     pub transaction_hash: [u8; 32],

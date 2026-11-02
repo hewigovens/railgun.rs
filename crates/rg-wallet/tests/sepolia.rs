@@ -1,8 +1,6 @@
 //! Sync and scan against the TS engine on real Sepolia logs.
 //!
-//! The wallet is the well-known public test mnemonic, which has notes on
-//! Sepolia. `vectors/m3/sepolia-head-200.engine.json` is the engine's result
-//! for the first 200 proxy logs (harness/m3.js).
+//! The wallet is the well-known public test mnemonic, which has notes on Sepolia. `vectors/m3/sepolia-head-200.engine.json` is the engine's result for the first 200 proxy logs (harness/m3.js).
 
 use std::path::Path;
 
@@ -129,10 +127,7 @@ fn head_200_matches_engine() {
     }
 }
 
-/// Full Sepolia history to block 12031295, if `data/sepolia-logs.jsonl` is
-/// present (it is not committed; ~23 MB). Expected values are the engine's
-/// (harness/m3.js on the same file). Slow in debug builds, so ignored by
-/// default: `cargo test --release -p rg-wallet -- --ignored`.
+/// Full Sepolia history to block 12031295, if `data/sepolia-logs.jsonl` is present (it is not committed; ~23 MB). Expected values are the engine's (harness/m3.js on the same file). Slow in debug builds, so ignored by default: `cargo test --release -p rg-wallet -- --ignored`.
 #[test]
 #[ignore]
 fn full_sepolia_matches_engine_when_data_present() {

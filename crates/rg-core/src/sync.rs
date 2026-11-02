@@ -18,9 +18,7 @@ pub struct SyncReport {
 }
 
 impl<S: ChainStore> Client<S> {
-    /// Seeds on a network with legacy events, once, and checks the seed's root
-    /// against the contract. The seed has no ciphertexts or nullifiers, so a
-    /// wallet's notes must all come after it.
+    /// Seeds on a network with legacy events, once, and checks the seed's root against the contract. The seed has no ciphertexts or nullifiers, so a wallet's notes must all come after it.
     fn bootstrap(&mut self, head: u64) -> Result<u64, Error> {
         let Some(url) = self.network.squid else {
             return Ok(self.network.deployment_block);
@@ -57,8 +55,7 @@ impl<S: ChainStore> Client<S> {
         Ok(last + 1)
     }
 
-    /// Brings the store and state up to the chain head. Refetches the last
-    /// `reorg_window` blocks each time, so a reorged log does not survive.
+    /// Brings the store and state up to the chain head. Refetches the last `reorg_window` blocks each time, so a reorged log does not survive.
     pub fn sync(&mut self) -> Result<SyncReport, Error> {
         let head = self.rpc.block_number()?;
         let start = match self.store.cursor()? {

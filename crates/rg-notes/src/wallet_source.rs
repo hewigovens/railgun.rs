@@ -1,6 +1,4 @@
-//! Wallet source names (`wallet/wallet-info.ts`): lowercase base 37 over
-//! `' 0123456789abcdefghijklmnopqrstuvwxyz'`, at most 16 characters.
-//! Leading spaces don't survive a round trip, as in the engine.
+//! Wallet source names (`wallet/wallet-info.ts`): lowercase base 37 over `' 0123456789abcdefghijklmnopqrstuvwxyz'`, at most 16 characters. Leading spaces don't survive a round trip, as in the engine.
 
 use crate::Error;
 
@@ -24,8 +22,7 @@ pub fn encode(source: &str) -> Result<u128, Error> {
     Ok(n)
 }
 
-/// The engine's hex string for a wallet source. Its padding branch is inverted,
-/// so non-empty results always have odd length; frozen behaviour.
+/// The engine's hex string for a wallet source. Its padding branch is inverted, so non-empty results always have odd length; frozen behaviour.
 pub fn encode_hex(source: &str) -> Result<String, Error> {
     if source.is_empty() {
         return Ok(String::new());

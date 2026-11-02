@@ -1,9 +1,6 @@
 //! circomlib-compatible Poseidon over BN254, 1 to 16 inputs.
 //!
-//! Port of codex-storage/rs-poseidon (MIT OR Apache-2.0), the implementation
-//! Railgun's own poseidon-hash-wasm uses, moved onto arkworks 0.5 with the
-//! constants parsed once instead of cloned per call. Constants are circomlib's
-//! optimized parameter set, vendored from rs-poseidon.
+//! Port of codex-storage/rs-poseidon (MIT OR Apache-2.0), the implementation Railgun's own poseidon-hash-wasm uses, moved onto arkworks 0.5 with the constants parsed once instead of cloned per call. Constants are circomlib's optimized parameter set, vendored from rs-poseidon.
 
 use std::sync::LazyLock;
 

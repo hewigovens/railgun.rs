@@ -1,7 +1,6 @@
 // Ported from ark-circom 0.5.0 (src/zkey.rs), https://github.com/arkworks-rs/circom-compat,
 // Copyright (c) 2021 Georgios Konstantopoulos, licensed MIT OR Apache-2.0.
-// Changes: byteorder replaced with std reads, section lookups return errors
-// instead of panicking, the header keeps n_public for callers, tests dropped.
+// Changes: byteorder replaced with std reads, section lookups return errors instead of panicking, the header keeps n_public for callers, tests dropped.
 //! ZKey Parsing
 //!
 //! Each ZKey file is broken into sections:
@@ -21,14 +20,7 @@
 //!       beta2
 //!       gamma2
 //!       delta2
-//!  IC(3)
-//!  Coefs(4)
-//!  PointsA(5)
-//!  PointsB1(6)
-//!  PointsB2(7)
-//!  PointsC(8)
-//!  PointsH(9)
-//!  Contributions(10)
+//!  IC(3)  Coefs(4)  PointsA(5)  PointsB1(6)  PointsB2(7)  PointsC(8)  PointsH(9)  Contributions(10)
 use ark_ff::{BigInteger256, PrimeField};
 use ark_relations::r1cs::ConstraintMatrices;
 use ark_serialize::{CanonicalDeserialize, SerializationError};
@@ -347,8 +339,7 @@ impl HeaderGroth {
     }
 }
 
-// need to divide by R, since snarkjs outputs the zkey with coefficients
-// multiplieid by R^2
+// need to divide by R, since snarkjs outputs the zkey with coefficients multiplieid by R^2
 fn deserialize_field_fr<R: Read>(reader: &mut R) -> IoResult<Fr> {
     let bigint = BigInteger256::deserialize_uncompressed(reader)?;
     Ok(Fr::new_unchecked(Fr::new_unchecked(bigint).into_bigint()))

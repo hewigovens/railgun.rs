@@ -2,10 +2,10 @@
 
 use ed25519_dalek::SigningKey;
 use rg_primitives::babyjubjub::{self, Point};
-use rg_primitives::{field, poseidon, Fr};
+use rg_primitives::{Fr, field, poseidon};
 
-use crate::bip32::KeyNode;
 use crate::Error;
+use crate::bip32::KeyNode;
 
 pub const SPENDING_PATH_PREFIX: &str = "m/44'/1984'/0'/0'/";
 pub const VIEWING_PATH_PREFIX: &str = "m/420'/1984'/0'/0'/";
@@ -29,8 +29,7 @@ pub struct WalletKeys {
     pub master_public_key: Fr,
 }
 
-/// BIP39 seed. The engine's `Mnemonic.toSeed` does not check the checksum;
-/// this parses the mnemonic and rejects bad checksums, which is stricter.
+/// BIP39 seed. The engine's `Mnemonic.toSeed` does not check the checksum; this parses the mnemonic and rejects bad checksums, which is stricter.
 pub fn mnemonic_to_seed(mnemonic: &str, password: &str) -> Result<[u8; 64], Error> {
     let m = bip39::Mnemonic::parse_normalized(mnemonic)
         .map_err(|e| Error::InvalidMnemonic(e.to_string()))?;

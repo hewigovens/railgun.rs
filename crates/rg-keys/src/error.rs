@@ -1,0 +1,11 @@
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum Error {
+    #[error("invalid derivation path")]
+    InvalidPath,
+    #[error("invalid mnemonic: {0}")]
+    InvalidMnemonic(String),
+    #[error("invalid address: {0}")]
+    InvalidAddress(&'static str),
+    #[error("incorrect address version {0}")]
+    AddressVersion(u8),
+}

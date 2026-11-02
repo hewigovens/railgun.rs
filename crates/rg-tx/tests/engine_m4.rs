@@ -1,26 +1,19 @@
 //! One 1x2 private transfer against the TS engine (harness/m4.js).
 //!
-//! `vectors/m4/transfer.json` is the engine's transfer from the throwaway
-//! Sepolia test wallet (index 0 to index 1) spending a synthetic shield
-//! appended to the first 200 Sepolia logs, with the engine's randomness
-//! pinned. `sepolia-vkey-1x2.json` is the contract's VerifyingKeySet log for
-//! the 1x2 circuit.
+//! `vectors/m4/transfer.json` is the engine's transfer from the throwaway Sepolia test wallet (index 0 to index 1) spending a synthetic shield appended to the first 200 Sepolia logs, with the engine's randomness pinned. `sepolia-vkey-1x2.json` is the contract's VerifyingKeySet log for the 1x2 circuit.
 //!
-//! Tests that need the wallet's keys read `.test-wallet/sepolia-test-mnemonic.txt`
-//! (gitignored) and skip without it. Tests that need the circuit artifacts
-//! are ignored by default; run them with
-//! `RG_ARTIFACTS_DIR=<dir with 1x2/> cargo test -p rg-tx --release -- --ignored`.
+//! Tests that need the wallet's keys read `.test-wallet/sepolia-test-mnemonic.txt` (gitignored) and skip without it. Tests that need the circuit artifacts are ignored by default; run them with `RG_ARTIFACTS_DIR=<dir with 1x2/> cargo test -p rg-tx --release -- --ignored`.
 
 use std::path::{Path, PathBuf};
 
 use alloy_primitives::B256;
 use alloy_sol_types::{SolCall, SolEvent};
-use rg_keys::{decode_address, WalletKeys};
+use rg_keys::{WalletKeys, decode_address};
+use rg_primitives::Fr;
 use rg_primitives::babyjubjub::Point;
 use rg_primitives::eddsa;
 use rg_primitives::field::from_decimal;
-use rg_primitives::Fr;
-use rg_sync::{abi, RawLog, SyncState};
+use rg_sync::{RawLog, SyncState, abi};
 use rg_tx::*;
 use rg_wallet::Scanner;
 use serde_json::Value;
@@ -84,8 +77,7 @@ fn test_mnemonic() -> Option<String> {
     }
 }
 
-/// Bound params hash of the engine's call equals its circuit input, and the
-/// calldata re-encodes byte for byte.
+/// Bound params hash of the engine's call equals its circuit input, and the calldata re-encodes byte for byte.
 #[test]
 fn bound_params_hash_and_calldata_match_engine() {
     let t = transfer();
@@ -121,8 +113,7 @@ fn signature_message_matches_engine() {
     assert!(eddsa::verify(&msg, &sig, &Point { x: pk[0], y: pk[1] }));
 }
 
-/// The snarkjs proof verifies against the key the Sepolia contract holds,
-/// and formatProof's G2 swap matches what the engine put in the call.
+/// The snarkjs proof verifies against the key the Sepolia contract holds, and formatProof's G2 swap matches what the engine put in the call.
 #[test]
 fn snarkjs_proof_verifies_against_onchain_key() {
     let t = transfer();
@@ -150,10 +141,7 @@ fn engine_state() -> SyncState {
     state
 }
 
-/// Engine draws in the order plan_transfer asks: sender random, recipient
-/// note random, change note random, then GCM and CTR IVs per output. Draws
-/// 0 to 5 belong to wallet setup and the shield; draw 9 is not used in the
-/// transaction's outputs.
+/// Engine draws in the order plan_transfer asks: sender random, recipient note random, change note random, then GCM and CTR IVs per output. Draws 0 to 5 belong to wallet setup and the shield; draw 9 is not used in the transaction's outputs.
 fn engine_fill(t: &Value) -> impl FnMut(&mut [u8]) {
     let draws: Vec<Vec<u8>> = t["randomDraws"]
         .as_array()
@@ -200,7 +188,7 @@ fn rust_prepared(t: &Value, mnemonic: &str) -> (WalletKeys, Prepared) {
         min_gas_price: 0,
     };
     let params = plan_transfer(&keys, &state, &scan, &req, engine_fill(t)).unwrap();
-    let prepared = prepare(&keys, &params).unwrap();
+    let prepared = params.prepare(&keys).unwrap();
     (keys, prepared)
 }
 
@@ -222,8 +210,7 @@ const FORMAT_ORDER: [&str; 14] = [
     "valueOut",
 ];
 
-/// With the engine's randomness, the Rust transfer has the same formatted
-/// inputs and the same bound params (ciphertexts byte for byte).
+/// With the engine's randomness, the Rust transfer has the same formatted inputs and the same bound params (ciphertexts byte for byte).
 #[test]
 fn transfer_inputs_match_engine() {
     let Some(mnemonic) = test_mnemonic() else {
@@ -260,8 +247,7 @@ fn transfer_inputs_match_engine() {
     );
 }
 
-/// The recipient (wallet index 1) and the sender's change both decrypt from
-/// the Rust-built ciphertexts once the commitments are on a tree.
+/// The recipient (wallet index 1) and the sender's change both decrypt from the Rust-built ciphertexts once the commitments are on a tree.
 #[test]
 fn recipient_decrypts_rust_transfer() {
     let Some(mnemonic) = test_mnemonic() else {
@@ -273,8 +259,7 @@ fn recipient_decrypts_rust_transfer() {
     let commitments: Vec<B256> = prepared.commitments.iter().map(fr_to_b256).collect();
     assert_eq!(commitments, tx.commitments);
 
-    // Append the events the contract would emit: Nullified for the spent
-    // note, then Transact with the Rust commitments and ciphertexts.
+    // Append the events the contract would emit: Nullified for the spent note, then Transact with the Rust commitments and ciphertexts.
     let mut state = engine_state();
     let ev = abi::Transact {
         treeNumber: alloy_primitives::U256::ZERO,
@@ -328,8 +313,7 @@ fn artifacts() -> PathBuf {
     PathBuf::from(std::env::var("RG_ARTIFACTS_DIR").expect("set RG_ARTIFACTS_DIR")).join("1x2")
 }
 
-/// The Rust witness equals snarkjs's, and an arkworks proof from it verifies
-/// against the on-chain key and goes into the call like the engine's.
+/// The Rust witness equals snarkjs's, and an arkworks proof from it verifies against the on-chain key and goes into the call like the engine's.
 #[test]
 #[ignore = "needs RG_ARTIFACTS_DIR with the 1x2 circuit"]
 fn rust_witness_and_proof_match() {

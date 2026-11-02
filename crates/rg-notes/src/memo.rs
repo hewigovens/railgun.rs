@@ -2,7 +2,7 @@
 
 use rg_primitives::aes::apply_ctr;
 
-use crate::{wallet_source, Error};
+use crate::{Error, wallet_source};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
@@ -44,10 +44,7 @@ pub struct AnnotationData {
     pub wallet_source: Option<String>,
 }
 
-/// `createEncryptedNoteAnnotationDataV2`: AES-256-CTR keyed with the sender's
-/// viewing private key over `outputType(1) || senderRandom(15)`, 15 zero bytes,
-/// and the wallet source left-padded to 15 bytes. Returns `iv || ciphertext`
-/// (62 bytes).
+/// `createEncryptedNoteAnnotationDataV2`: AES-256-CTR keyed with the sender's viewing private key over `outputType(1) || senderRandom(15)`, 15 zero bytes, and the wallet source left-padded to 15 bytes. Returns `iv || ciphertext` (62 bytes).
 pub fn encrypt_annotation_v2(
     output_type: OutputType,
     sender_random: &[u8; 15],
@@ -65,10 +62,7 @@ pub fn encrypt_annotation_v2(
     Ok(out)
 }
 
-/// `decryptNoteAnnotationData`. The engine reads the ciphertext back as 16,
-/// 16 and 16 bytes although it wrote 16, 15 and 15; CTR is a stream, so this
-/// only drops the wallet source's leading byte, which is zero for any source
-/// of 16 characters or fewer. Mirrored here slice for slice.
+/// `decryptNoteAnnotationData`. The engine reads the ciphertext back as 16, 16 and 16 bytes although it wrote 16, 15 and 15; CTR is a stream, so this only drops the wallet source's leading byte, which is zero for any source of 16 characters or fewer. Mirrored here slice for slice.
 pub fn decrypt_annotation(data: &[u8], viewing_private_key: &[u8; 32]) -> Option<AnnotationData> {
     if data.len() < 32 {
         return None;

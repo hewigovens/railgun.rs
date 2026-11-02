@@ -1,6 +1,4 @@
-//! Writes Rust-made note ciphertexts, shield ciphertexts and EdDSA signatures
-//! as JSON, with randoms the TS engine never saw, for harness/check-rust.js to
-//! decrypt and verify with the engine:
+//! Writes Rust-made note ciphertexts, shield ciphertexts and EdDSA signatures as JSON, with randoms the TS engine never saw, for harness/check-rust.js to decrypt and verify with the engine:
 //!
 //!     cargo run -p rg-notes --example emit_ciphertexts > /tmp/rust-ciphertexts.json
 //!     node harness/check-rust.js /tmp/rust-ciphertexts.json
@@ -8,12 +6,12 @@
 use rg_keys::WalletKeys;
 use rg_notes::shield::encrypt_shield;
 use rg_notes::transact::{
-    create_commitment_ciphertext_v2, OutputNote, ViewingKeys, SENDER_RANDOM_NULL,
+    OutputNote, SENDER_RANDOM_NULL, ViewingKeys, create_commitment_ciphertext_v2,
 };
 use rg_notes::{OutputType, TokenData};
 use rg_primitives::eddsa::sign;
 use rg_primitives::field::{from_be_bytes_mod_order, to_decimal};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
 struct Rng(u64);

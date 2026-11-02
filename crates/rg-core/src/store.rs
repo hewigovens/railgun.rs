@@ -1,6 +1,4 @@
-//! Durable chain data. Replaying it rebuilds [`rg_sync::SyncState`] in about
-//! two seconds for Arbitrum, so the store keeps inputs, not derived trees, and
-//! the mobile cost of a real database can wait until it is measured.
+//! Durable chain data. Replaying it rebuilds [`rg_sync::SyncState`] in about two seconds for Arbitrum, so the store keeps inputs, not derived trees, and the mobile cost of a real database can wait until it is measured.
 
 use std::fs;
 use std::io::Write;

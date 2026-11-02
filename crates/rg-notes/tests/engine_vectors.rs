@@ -44,10 +44,16 @@ fn memo_text_encoding() {
     assert_eq!(decode_text(&[]), None);
     let long = "A really long memo with emojis 😐👩🏾‍🔧😎 and other text !@#$%^&*() Private memo field 🤡🙀🥰👩🏿‍🚒🧞 🤡 🙀 🥰 👩🏿‍🚒 🧞, in order to test a major memo for a real live production use case.";
     let encoded = encode_text(Some(long));
-    assert_eq!(hex::encode(&encoded), "41207265616c6c79206c6f6e67206d656d6f207769746820656d6f6a697320f09f9890f09f91a9f09f8fbee2808df09f94a7f09f988e20616e64206f7468657220746578742021402324255e262a28292050726976617465206d656d6f206669656c6420f09fa4a1f09f9980f09fa5b0f09f91a9f09f8fbfe2808df09f9a92f09fa79e20f09fa4a120f09f998020f09fa5b020f09f91a9f09f8fbfe2808df09f9a9220f09fa79e2c20696e206f7264657220746f20746573742061206d616a6f72206d656d6f20666f722061207265616c206c6976652070726f64756374696f6e2075736520636173652e");
+    assert_eq!(
+        hex::encode(&encoded),
+        "41207265616c6c79206c6f6e67206d656d6f207769746820656d6f6a697320f09f9890f09f91a9f09f8fbee2808df09f94a7f09f988e20616e64206f7468657220746578742021402324255e262a28292050726976617465206d656d6f206669656c6420f09fa4a1f09f9980f09fa5b0f09f91a9f09f8fbfe2808df09f9a92f09fa79e20f09fa4a120f09f998020f09fa5b020f09f91a9f09f8fbfe2808df09f9a9220f09fa79e2c20696e206f7264657220746f20746573742061206d616a6f72206d656d6f20666f722061207265616c206c6976652070726f64756374696f6e2075736520636173652e"
+    );
     assert_eq!(decode_text(&encoded).as_deref(), Some(long));
     let short = "Private memo field 🤡🙀🥰👩🏿‍🚒🧞 🤡 🙀 🥰 👩🏿‍🚒 🧞,";
-    assert_eq!(hex::encode(encode_text(Some(short))), "50726976617465206d656d6f206669656c6420f09fa4a1f09f9980f09fa5b0f09f91a9f09f8fbfe2808df09f9a92f09fa79e20f09fa4a120f09f998020f09fa5b020f09f91a9f09f8fbfe2808df09f9a9220f09fa79e2c");
+    assert_eq!(
+        hex::encode(encode_text(Some(short))),
+        "50726976617465206d656d6f206669656c6420f09fa4a1f09f9980f09fa5b0f09f91a9f09f8fbfe2808df09f9a92f09fa79e20f09fa4a120f09f998020f09fa5b020f09f91a9f09f8fbfe2808df09f9a9220f09fa79e2c"
+    );
 }
 
 #[test]
@@ -77,9 +83,9 @@ fn shield_signature_message() {
 }
 
 #[test]
+#[allow(clippy::too_many_lines)] // One vector table.
 fn legacy_notes_random_npk_and_hash() {
-    // transact-note.test.ts "Should serialize and deserialize notes": the random is
-    // AES-256-GCM encrypted under the viewing private key, iv || tag then data.
+    // transact-note.test.ts "Should serialize and deserialize notes": the random is AES-256-GCM encrypted under the viewing private key, iv || tag then data.
     let address = "0zk1qxvsy4jxshey7wtzv0ry7kp24x58fxtsg5yuvzrzjv93l8mayk8garv7j6fe3z53l7vsy4jxshey7wtzv0ry7kp24x58fxtsg5yuvzrzjv93l8mayk8guau6ef8";
     let mpk = decode_address(address).unwrap().master_public_key;
     // (npk, tokenHash, value, encryptedRandom[0], encryptedRandom[1], random, vpk, hash)

@@ -1,5 +1,4 @@
-//! BN254 scalar field helpers. Railgun treats 32-byte values as big-endian
-//! integers and reduces them mod p wherever they enter a hash.
+//! BN254 scalar field helpers. Railgun treats 32-byte values as big-endian integers and reduces them mod p wherever they enter a hash.
 
 use ark_ff::{BigInteger, PrimeField};
 

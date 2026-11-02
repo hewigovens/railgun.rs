@@ -1,10 +1,6 @@
 //! Shield ciphertexts (`note/shield-note.ts`).
 //!
-//! `encryptedBundle[0] = iv || tag` of the GCM-encrypted note random,
-//! `[1] = encryptedRandom(16) || ctrIV(16)`, `[2]` = the receiver's viewing
-//! public key under AES-256-CTR keyed with the shield private key.
-//! `shieldKey` is the Ed25519 public key of the shield private key; the
-//! receiver gets the shared key from its viewing private key and `shieldKey`.
+//! `encryptedBundle[0] = iv || tag` of the GCM-encrypted note random, `[1] = encryptedRandom(16) || ctrIV(16)`, `[2]` = the receiver's viewing public key under AES-256-CTR keyed with the shield private key. `shieldKey` is the Ed25519 public key of the shield private key; the receiver gets the shared key from its viewing private key and `shieldKey`.
 
 use rg_primitives::aes::{apply_ctr, decrypt_gcm, encrypt_gcm};
 use rg_primitives::ed25519::{public_key, shared_key};

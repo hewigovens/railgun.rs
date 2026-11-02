@@ -1,13 +1,10 @@
 //! `0zk` addresses (engine src/key-derivation/bech32.ts).
 //!
-//! Payload, 73 bytes: `version(1) || mpk(32 BE) || networkID(8) || viewingPub(32)`,
-//! bech32m with HRP `0zk`. networkID is `chainType(1) || chainId(7 BE)`, or eight
-//! 0xff bytes for "all chains", XORed with the 7 bytes of "railgun". The engine's
-//! buffer-xor 2.0.2 XORs to the longer length, so the 8th byte passes through.
+//! Payload, 73 bytes: `version(1) || mpk(32 BE) || networkID(8) || viewingPub(32)`, bech32m with HRP `0zk`. networkID is `chainType(1) || chainId(7 BE)`, or eight 0xff bytes for "all chains", XORed with the 7 bytes of "railgun". The engine's buffer-xor 2.0.2 XORs to the longer length, so the 8th byte passes through.
 
 use bech32::primitives::decode::CheckedHrpstring;
 use bech32::{Bech32m, Hrp};
-use rg_primitives::{field, Fr};
+use rg_primitives::{Fr, field};
 
 use crate::Error;
 

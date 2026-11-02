@@ -1,10 +1,8 @@
-//! Make a fresh test wallet: 12-word mnemonic from /dev/urandom, written to the
-//! file given as the first argument (refuses to overwrite), and its 0zk address
-//! (all chains, index 0) printed to stdout.
+//! Make a fresh test wallet: 12-word mnemonic from /dev/urandom, written to the file given as the first argument (refuses to overwrite), and its 0zk address (all chains, index 0) printed to stdout.
 
 use std::io::Read;
 
-use rg_keys::address::{encode_address, AddressData, ADDRESS_VERSION};
+use rg_keys::address::{ADDRESS_VERSION, AddressData, encode_address};
 use rg_keys::keys::WalletKeys;
 
 fn main() {

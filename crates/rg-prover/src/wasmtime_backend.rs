@@ -2,8 +2,8 @@
 
 use wasmtime::{Caller, Engine, Linker, Module, Store, TypedFunc};
 
-use crate::witness::{exception_message, CircomInstance, WitnessCalculator};
 use crate::Error;
+use crate::witness::{CircomInstance, WitnessCalculator, exception_message};
 
 fn err(e: impl std::fmt::Display) -> Error {
     Error::Witness(e.to_string())

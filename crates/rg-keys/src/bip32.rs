@@ -1,5 +1,4 @@
-//! Railgun's hardened-only BIP32 variant (engine src/key-derivation/bip32.ts).
-//! Same algorithm as SLIP-0010 with the HMAC key "babyjubjub seed".
+//! Railgun's hardened-only BIP32 variant (engine src/key-derivation/bip32.ts). Same algorithm as SLIP-0010 with the HMAC key "babyjubjub seed".
 
 use hmac::{Hmac, Mac};
 use sha2::Sha512;

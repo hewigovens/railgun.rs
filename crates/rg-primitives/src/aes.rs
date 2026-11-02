@@ -1,7 +1,4 @@
-//! AES-256 as the engine uses it (`utils/encryption/aes.ts`): GCM with a
-//! 16-byte IV and 16-byte tag, and CTR with a 16-byte big-endian counter.
-//! The engine encrypts a list of blocks through one cipher stream, so the
-//! ciphertext of the blocks is the ciphertext of their concatenation.
+//! AES-256 as the engine uses it (`utils/encryption/aes.ts`): GCM with a 16-byte IV and 16-byte tag, and CTR with a 16-byte big-endian counter. The engine encrypts a list of blocks through one cipher stream, so the ciphertext of the blocks is the ciphertext of their concatenation.
 
 use aes::Aes256;
 use aes_gcm::aead::consts::U16;
