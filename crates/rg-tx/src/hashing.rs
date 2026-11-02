@@ -16,10 +16,6 @@ pub fn fr_to_b256(x: &Fr) -> B256 {
     B256::from(to_be_bytes(x))
 }
 
-pub fn b256_to_fr(x: &B256) -> Fr {
-    from_be_bytes_mod_order(x.as_slice())
-}
-
 fn keccak(data: &[u8]) -> [u8; 32] {
     let mut k = Keccak::v256();
     k.update(data);

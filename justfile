@@ -18,10 +18,13 @@ test-proof artifacts:
 
 format:
   cargo fmt --all
+  swiftformat crates/rg-uniffi/tests/swift
 
 lint:
   cargo fmt --all -- --check
   cargo clippy --workspace --all-targets --features rg-sync/rpc,rg-poi/rpc,rg-prover/wasmtime
+  swiftformat --lint crates/rg-uniffi/tests/swift
+  swiftlint lint --strict --quiet
 
 # Example: just wallet arbitrum https://arb1.arbitrum.io/rpc data/chain mnemonic.txt balance
 wallet *args:
@@ -45,6 +48,6 @@ test-kotlin: ffi
 
 # Compiles the bindings with the smoke test and runs it. Set RG_MNEMONIC_FILE for the live part.
 test-swift: ffi
-  swiftc -O -o build/smoke crates/rg-uniffi/tests/swift/main.swift build/bindings/RailgunCore.swift \
+  swiftc -O -o build/smoke crates/rg-uniffi/tests/swift/*.swift build/bindings/RailgunCore.swift \
     -I build/bindings/Headers -L target/release -lrg_uniffi
   DYLD_LIBRARY_PATH=target/release build/smoke

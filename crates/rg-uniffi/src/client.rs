@@ -1,10 +1,10 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
-use rg_core::{Artifacts, Client, FileStore, PoiProof, Transfer, Unshield, UnsignedTx};
+use rg_core::{Artifacts, Client, FileStore, Transfer, Unshield, UnsignedTx};
 use rg_sync::Network;
 
-use crate::{RailgunError, SyncReport, TokenBalance, Wallet};
+use crate::{PoiSubmission, RailgunError, SyncReport, TokenBalance, Wallet};
 
 fn hex_bytes<const N: usize>(value: &str) -> Result<[u8; N], RailgunError> {
     hex::decode(value.trim_start_matches("0x"))
@@ -129,10 +129,4 @@ impl RailgunClient {
         let status = self.client().poi_status(&submission.proof)?;
         Ok(status.len() == submission.proof.blinded.len() && status.values().all(|s| s == "Valid"))
     }
-}
-
-/// A POI proof between proving and submitting.
-#[derive(uniffi::Object)]
-pub struct PoiSubmission {
-    proof: PoiProof,
 }

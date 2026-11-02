@@ -138,10 +138,6 @@ impl Node {
         Ok(v.as_bool().unwrap_or(false))
     }
 
-    pub fn validated_txid(&self) -> Result<Value, NodeError> {
-        self.call("ppoi_validated_txid", json!({}))
-    }
-
     pub fn submit_transact_proof(
         &self,
         list_key: &str,

@@ -1,0 +1,15 @@
+--swiftversion 6.0
+--indent 4
+--indentcase true
+--trimwhitespace always
+--voidtype void
+--wraparguments before-first
+--wrapparameters before-first
+--wrapcollections before-first
+--self remove
+--importgrouping alpha
+--semicolons never
+--commas inline
+--stripunusedargs closure-only
+--disable modifierOrder
+--header strip

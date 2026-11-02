@@ -13,9 +13,7 @@ mod unshield;
 
 pub use contract::{snark_proof, transact_calldata, verifying_key_from_contract};
 pub use error::Error;
-pub use hashing::{
-    b256_to_fr, chain_full_network_id, fr_to_b256, hash_bound_params, signature_message,
-};
+pub use hashing::{chain_full_network_id, fr_to_b256, hash_bound_params, signature_message};
 pub use params::{OutputPlan, SpendNote, TransferParams, circuit_exists};
 pub use plan::{
     MAX_INPUTS, TransferRequest, UnshieldRequest, plan_transfer, plan_unshield, select_notes,

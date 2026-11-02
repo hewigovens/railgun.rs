@@ -4,4 +4,4 @@ ffi_module_name = "RailgunFFI"
 generate_immutable_records = true
 
 [crates.rg_uniffi.bindings.kotlin]
-package_name = "com.hewigovens.railgun"
+package_name = "dev.hewig.railgun"

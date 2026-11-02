@@ -77,7 +77,7 @@ not leave a wallet holding these keys open in Railway, or it submits POI first.
 
 `just ffi` writes Swift bindings to `build/bindings`, and `just ffi-apple` also builds `build/RailgunFFI.xcframework` for macOS, iOS and the iOS simulator. `just test-swift` runs `crates/rg-uniffi/tests/swift/main.swift` offline; set `RG_MNEMONIC_FILE`, `RG_RPC`, `RG_DATA`, `RG_FROM`, `RG_RECIPIENT`, `RG_TOKEN` and optionally `RG_POI_TX` to run the live part, which sends nothing.
 
-`just ffi` also writes Kotlin bindings (package `com.hewigovens.railgun`), `just ffi-android` builds `build/android/jniLibs` for arm64-v8a and x86_64 at 16 KB page alignment (needs `ANDROID_NDK_HOME` and `cargo-ndk`; NDK 27.3 works), and `just test-kotlin` runs `crates/rg-uniffi/tests/kotlin` on the JVM with the same variables.
+`just ffi` also writes Kotlin bindings (package `dev.hewig.railgun`), `just ffi-android` builds `build/android/jniLibs` for arm64-v8a and x86_64 at 16 KB page alignment (needs `ANDROID_NDK_HOME` and `cargo-ndk`; NDK 27.3 works), and `just test-kotlin` runs `crates/rg-uniffi/tests/kotlin` on the JVM with the same variables.
 
 Android coverage so far: the `wallet` example, built with the NDK, ran on an Android 16 arm64 emulator against live Arbitrum: sync 2.9 s, transfer with proving 2.9 s, POI 9.9 s with cached circuits and leaves. The Kotlin bindings have not run inside an Android app, so loading `librg_uniffi.so` through JNA on Android is untested. Emulator times come from this M4 Pro, not a phone.
 

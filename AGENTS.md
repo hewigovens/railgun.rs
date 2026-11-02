@@ -32,6 +32,10 @@ Dependency direction, never inverted: `rg-primitives` → `rg-keys`, `rg-notes`,
 
 `rg-uniffi` follows JayJay's layout: `uniffi::setup_scaffolding!()` in `lib.rs`, `src/types/` for records, `#[uniffi::remote(...)]` for records owned by core crates, `#[derive(uniffi::Object)]` wrappers around `rg-core` types, and a `uniffi-bindgen.rs` binary behind the `cli` feature. It adds no logic. `u128` does not cross the boundary, so amounts are decimal strings. Calls block, so shells run them off the UI thread. Run `just test-swift` and `just test-kotlin` when the surface changes. Error fields are `reason`, since `message` collides with Kotlin's `Throwable.message`.
 
+## Swift And Kotlin
+
+Generated bindings stay in `build/`. Hand-written Swift and Kotlin follow JayJay's Swift rules: 4-space indent, one primary type per file, extensions and computed properties over free helpers, and growing types split into `TypeName+Responsibility.swift`. `.swiftformat` and `.swiftlint.yml` enforce Swift through `just lint`. Kotlin mirrors the structure, with objects, classes and extension functions, and `main` as the only top-level function. The Kotlin package is `dev.hewig.railgun`.
+
 ## Version Control
 
 This repo uses Jujutsu in a colocated checkout. Use `jj` for history, not `git commit` or `git push`.

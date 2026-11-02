@@ -145,11 +145,6 @@ impl Artifacts {
             zkey: self.fetch(circuit, Kind::Zkey)?,
         })
     }
-
-    /// Fetches a circuit ahead of time, so the first proof is not the slow one.
-    pub fn prepare(&self, circuit: Circuit) -> Result<(), Error> {
-        self.load(circuit).map(|_| ())
-    }
 }
 
 #[cfg(test)]

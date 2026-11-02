@@ -32,12 +32,4 @@ impl<S: ChainStore> Client<S> {
         self.state = state;
         Ok(())
     }
-
-    pub fn state(&self) -> &SyncState {
-        &self.state
-    }
-
-    pub fn network(&self) -> Network {
-        self.network
-    }
 }

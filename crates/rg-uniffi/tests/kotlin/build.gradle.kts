@@ -16,6 +16,6 @@ kotlin {
 }
 
 application {
-    mainClass.set("SmokeKt")
+    mainClass.set("dev.hewig.railgun.smoke.MainKt")
     applicationDefaultJvmArgs = listOf("-Djna.library.path=${rootDir.resolve("../../../../target/release").canonicalPath}")
 }

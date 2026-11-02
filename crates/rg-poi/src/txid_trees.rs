@@ -24,13 +24,6 @@ impl TxidTrees {
         Ok(())
     }
 
-    /// Global index of the newest leaf.
-    pub fn latest_index(&self) -> Option<u64> {
-        let last = self.trees.last()?;
-        let full = (self.trees.len() - 1) as u64 * TREE_CAPACITY as u64;
-        Some(full + last.len() as u64 - 1)
-    }
-
     pub fn root(&self, tree: usize) -> Option<Fr> {
         self.trees.get(tree).map(MerkleTree::root)
     }
@@ -56,7 +49,6 @@ mod tests {
         let leaves: Vec<Fr> = (0..TREE_CAPACITY as u64 + 3).map(Fr::from).collect();
         let mut bulk = TxidTrees::default();
         bulk.extend(&leaves).unwrap();
-        assert_eq!(bulk.latest_index(), Some(TREE_CAPACITY as u64 + 2));
 
         let mut second = MerkleTree::new();
         second.insert(0, &leaves[TREE_CAPACITY..]).unwrap();
