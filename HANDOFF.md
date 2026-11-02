@@ -1,6 +1,7 @@
 # Handoff (2026-11-02)
 
-Read `scope.md` for the plan and `README.md` for commands. This file is what those two
+Read `scope.md` for the plan, `docs/architecture.md` for the design and `README.md` for
+commands. This file is what those two
 don't say.
 
 ## Where it stands
@@ -12,7 +13,7 @@ don't say.
 | M2 notes, EdDSA, Ed25519 blinding, AES | done, byte-equal to the engine |
 | M3 Sepolia sync, tree, scan | done, matches the engine on all of Sepolia to block 12031295 |
 | M4 prove and submit one transfer | done on Arbitrum; the Anon wallet received it |
-| M5 POI | done on Arbitrum for transfers: a Rust proof reached `Valid` |
+| M5 POI | done on Arbitrum for transfers: a Rust proof reached `Valid`, Anon shows the funds spendable |
 
 Tests: `cargo test --workspace` gives 56 passed, 2 ignored (the M3 full-history test
 needs Sepolia `data/`, the M4 witness and proof test needs circuit artifacts). Two tests

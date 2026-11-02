@@ -1,7 +1,8 @@
 # railgun-rust-core
 
 A Rust core for a private Railgun wallet, meant to be exposed to Swift and Kotlin
-through UniFFI. See `scope.md` for the plan and milestones.
+through UniFFI. See `scope.md` for the plan and milestones, and
+`docs/architecture.md` for crates and flows.
 
 ## Status
 
@@ -34,8 +35,8 @@ through UniFFI. See `scope.md` for the plan and milestones.
   Sepolia contract's 1x2 key accept the Rust proof, and the recipient decrypts the note.
   Submitted on Arbitrum; Anon wallet received it.
 - M5: `crates/rg-poi` (txid trees, blinded commitments, POI circuit inputs, aggregator
-  client). On Arbitrum a Rust proof took a private transfer's outputs to `Valid`. Shields
-  and unshields are not covered. See `HANDOFF.md` for the POI artifacts, which are newer
+  client). On Arbitrum a Rust proof took a private transfer's outputs to `Valid`, and Anon
+  wallet moved the funds from pending to spendable. Shields and unshields are not covered. See `HANDOFF.md` for the POI artifacts, which are newer
   than the engine's.
 
 ## Running the tests
