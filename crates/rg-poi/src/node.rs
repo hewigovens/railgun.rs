@@ -139,16 +139,6 @@ impl Node {
         self.call("ppoi_validated_txid", json!({}))
     }
 
-    /// `SingleCommitmentProofsData`, which adds one output of a mined
-    /// transaction to the list on the strength of a pre-transaction proof.
-    pub fn submit_single_commitment_proofs(&self, data: Value) -> Result<(), NodeError> {
-        self.call(
-            "ppoi_submit_single_commitment_proofs",
-            json!({"singleCommitmentProofsData": data}),
-        )?;
-        Ok(())
-    }
-
     pub fn submit_transact_proof(
         &self,
         list_key: &str,

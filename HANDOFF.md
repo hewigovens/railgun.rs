@@ -12,9 +12,9 @@ commands. This file is what the cloud session knew that those two don't say.
 | M2 notes, EdDSA, Ed25519 blinding, AES | done, byte-equal to the engine |
 | M3 Sepolia sync, tree, scan | done, matches the engine on all of Sepolia to block 12031295 |
 | M4 prove and submit one transfer | done on Arbitrum; the Anon wallet received it |
-| M5 POI | Rust proving works; the first transfer went `Valid` only after Railway handled it |
+| M5 POI | done on Arbitrum for transfers: a Rust proof reached `Valid` |
 
-Tests: `cargo test --workspace` gives 55 passed, 2 ignored (the M3 full-history test
+Tests: `cargo test --workspace` gives 54 passed, 2 ignored (the M3 full-history test
 needs `data/`, the M4 witness and proof test needs circuit artifacts). Two of the 48
 skip quietly without `.test-wallet/sepolia-test-mnemonic.txt`.
 
@@ -65,32 +65,20 @@ POI (M5). The `shield` example also takes a network if a wallet-free shield is w
 
 ## M5 state
 
-`crates/rg-poi` and its `submit_poi` example, run on the Arbitrum transfer (seed, logs and
-`data/artifacts/poi-3x3` or `poi-13x13`, decompressed from the engine's lite `poi/` folder;
-both vkeys equal the production IPFS ones).
+`crates/rg-poi` and its `submit_poi` example. Arbitrum tx
+`0x32383758ec908c66fea5299ef0456d97147117f8f1f507d3783026212adc1cb8` got both outputs to
+`Valid` from a Rust proof with `--submit`, within a minute, with Railway closed.
 
-Works: the txid tree from the squid equals the aggregator's validated root (71,318
-transactions), the input note is `Valid` on list `efc6ddb5...`, the proof verifies
-against the key, and engine 9.6.0 and 9.0.1 (the node's pinned version) with snarkjs both
-verify it through `getPublicInputsPOI` and `verifyPOIProof`.
+POI artifacts: the engine's lite `poi/` folder and the IPFS root in engine 9.6.0 and wallet
+10.9.0 (`QmZrP9zaZw2L...`) are stale, and the live aggregator answers `Invalid proof` to
+proofs made with them. Railway's wallet 11.2.0 uses
+`QmZ2MyM6TKxffkv6stuo2hFwmUfs3q4xgMYN164Sje8new`, with `circuits/03x03/{vkey.json,zkey.br}`
+and `prover/snarkjs/03x03.wasm.br` on `https://ipfs-lb.com/ipfs/`. Decompress into
+`data/artifacts/poi-3x3/{circuit.wasm,circuit.zkey}`. Only the 3x3 set is fetched. Their
+wasm needs two more runtime imports, now stubbed in both backends. The harness still pins
+engine 9.6.0, so it does not match this POI key.
 
-Blocked: `ppoi.fdi.network` answers `Invalid proof` to `ppoi_submit_transact_proof`. It did
-so for arkworks 3x3, arkworks 13x13 and a snarkjs 3x3 proof of the same inputs, so this is
-not the Rust prover. `--single` (`ppoi_submit_single_commitment_proofs`) returns success,
-but this node only forwards to the list provider and swallows errors from it, and after
-minutes the outputs stay `Missing` with no queue or event change. Those requests are not
-checked against `POIValidation.assertIsValidSpendableTXID` locally yet.
-
-Update: with the sender mnemonic imported into Railway, both outputs went `Valid` on
-2026-11-02 at 09:11 local, about 16 minutes after a Railway restart and 82 minutes after
-the `--single` submission. So the aggregator accepts this transaction, and it reports
-`Valid` for the blinded commitments Rust computed. Railway's request was not captured, so
-nothing yet shows what differs from ours, and a late `--single` is not strictly ruled out.
-This transaction can no longer be used as a test: it is already in the list.
-
-Next: send a new transfer from the sender wallet (quit Railway first, or it will submit
-POI itself), submit with `submit_poi`, and compare with a request captured from Railway's
-network log for a separate transfer.
+The first transfer's POI was made by Railway, after importing the sender mnemonic.
 
 ## Circuit artifacts
 
@@ -142,7 +130,7 @@ in the lite set, so `plan_transfer` spends one note only.
 
 ## Open items
 
-- M5: get a POI proof accepted (below).
+- POI for shields and unshields; 13x13 for larger transactions; polling built into the flow.
 - Several inputs (2x2 needs production artifacts from IPFS), unshield, relay adapt,
   broadcaster fees.
 - Decoding legacy (pre-V2.1) events, so older wallets can scan; reorg handling, persistent

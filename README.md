@@ -32,7 +32,11 @@ through UniFFI. See `scope.md` for the plan and milestones.
   `VerifyingKeySet` event). Against the TS engine with randoms pinned: circuit inputs,
   bound params and calldata are identical, the witness equals snarkjs's, snarkjs and the
   Sepolia contract's 1x2 key accept the Rust proof, and the recipient decrypts the note.
-  Submitting is the remaining step.
+  Submitted on Arbitrum; Anon wallet received it.
+- M5: `crates/rg-poi` (txid trees, blinded commitments, POI circuit inputs, aggregator
+  client). On Arbitrum a Rust proof took a private transfer's outputs to `Valid`. Shields
+  and unshields are not covered. See `HANDOFF.md` for the POI artifacts, which are newer
+  than the engine's.
 
 ## Running the tests
 

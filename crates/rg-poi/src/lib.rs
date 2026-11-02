@@ -7,7 +7,7 @@
 //! of this.
 
 use rg_primitives::{poseidon, Fr};
-use rg_tree::{hash_left_right, zero_value, MerkleProof, MerkleTree, TREE_CAPACITY, TREE_DEPTH};
+use rg_tree::{zero_value, MerkleProof, MerkleTree, TREE_CAPACITY, TREE_DEPTH};
 
 #[cfg(feature = "rpc")]
 pub mod node;
@@ -32,27 +32,6 @@ pub enum Error {
 
 pub fn global_tree_position(tree: u32, index: u32) -> u64 {
     tree as u64 * TREE_CAPACITY as u64 + index as u64
-}
-
-/// The fixed output position of a pre-transaction POI proof, which is made
-/// before the transaction has a real one.
-pub fn pre_transaction_position() -> u64 {
-    const HARDCODED: u32 = 199_999;
-    global_tree_position(HARDCODED, HARDCODED)
-}
-
-/// `createDummyMerkleProof`: a pre-transaction proof's txid path, all zeros.
-pub fn dummy_txid_proof(leaf: Fr) -> MerkleProof {
-    let elements = [Fr::from(0u64); TREE_DEPTH];
-    let root = elements
-        .iter()
-        .fold(leaf, |node, sibling| hash_left_right(&node, sibling));
-    MerkleProof {
-        leaf,
-        elements,
-        indices: 0,
-        root,
-    }
 }
 
 pub fn blinded_commitment(commitment: &Fr, npk: &Fr, global_position: u64) -> Fr {
@@ -274,11 +253,6 @@ mod tests {
         let proof = bulk.proof(TREE_CAPACITY as u64 + 1).unwrap();
         assert!(proof.verify());
         assert_eq!(proof.leaf, leaves[TREE_CAPACITY + 1]);
-    }
-
-    #[test]
-    fn dummy_proof_verifies() {
-        assert!(dummy_txid_proof(Fr::from(5u64)).verify());
     }
 
     #[test]

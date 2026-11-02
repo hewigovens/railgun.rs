@@ -1,18 +1,16 @@
 //! Prove POI for one transaction this wallet sent, and optionally submit it.
 //!
 //! cargo run --release -p rg-poi --features rpc --example submit_poi -- \
-//!   <network> <seed leaves> <logs.jsonl> <mnemonic-file> <artifacts/poi-3x3> <tx hash> [mode]
+//!   <network> <seed leaves> <logs.jsonl> <mnemonic-file> <artifacts/poi-3x3> <tx hash> [--submit]
 //!
-//! Without a mode it stops after printing statuses and the proof. `--transact`
-//! submits a transact proof against the real txid tree. `--single` submits a
-//! pre-transaction proof once per output, as wallets do for a recipient's note.
+//! Without --submit it stops after printing statuses and the proof.
 
 use rand::rngs::OsRng;
 use rg_keys::WalletKeys;
 use rg_poi::node::{blinded_hex, Node};
 use rg_poi::{
-    blinded_commitment, dummy_txid_proof, global_tree_position, pre_transaction_position,
-    railgun_txid, txid_leaf, OutputNote, ProofInputs, SpentNote, TxidTrees,
+    blinded_commitment, global_tree_position, railgun_txid, txid_leaf, OutputNote, ProofInputs,
+    SpentNote, TxidTrees,
 };
 use rg_primitives::{field, Fr};
 use rg_sync::squid::fetch_transactions;
@@ -38,7 +36,7 @@ fn main() {
         .unwrap()
         .try_into()
         .unwrap();
-    let mode = a.get(7).map(String::as_str);
+    let submit = a.get(7).is_some_and(|s| s == "--submit");
     let node = Node::new(NODE, network.chain_id);
 
     let mut state = SyncState::new();
@@ -131,48 +129,25 @@ fn main() {
             value: s.value,
         })
         .collect();
-    let single = mode == Some("--single");
-    let txid = railgun_txid(
-        &tx.nullifiers.iter().map(|n| fr(n)).collect::<Vec<_>>(),
-        &tx.commitments.iter().map(|c| fr(c)).collect::<Vec<_>>(),
-        &fr(&tx.bound_params_hash),
-    );
-    // A pre-transaction proof blinds outputs at the hardcoded position; the
-    // aggregator rebuilds the real blinded commitment from each output's data.
-    let start_out = if single {
-        pre_transaction_position()
-    } else {
-        global_tree_position(tx.utxo_tree_out, start)
-    };
-    let txid_proof = if single {
-        dummy_txid_proof(txid_leaf(&txid, tx.utxo_tree_in, start_out))
-    } else {
-        trees.proof(position as u64).unwrap()
-    };
-    let blinded = |at: u64| -> Vec<Fr> {
-        sent.iter()
-            .zip(&outputs)
-            .enumerate()
-            .map(|(i, (s, o))| blinded_commitment(&fr(&s.commitment), &o.npk, at + i as u64))
-            .collect()
-    };
-    let blinded_out = blinded(start_out);
-    let blinded_out_hex: Vec<String> = blinded_out.iter().map(blinded_hex).collect();
-    let blinded_real: Vec<String> = blinded(global_tree_position(tx.utxo_tree_out, start))
+    let start_out = global_tree_position(tx.utxo_tree_out, start);
+    let blinded_out: Vec<Fr> = sent
         .iter()
-        .map(blinded_hex)
+        .zip(&outputs)
+        .enumerate()
+        .map(|(i, (s, o))| blinded_commitment(&fr(&s.commitment), &o.npk, start_out + i as u64))
         .collect();
+    let blinded_out_hex: Vec<String> = blinded_out.iter().map(blinded_hex).collect();
 
     let status = |list: &[String]| {
         let items: Vec<_> = list.iter().map(|b| (b.clone(), "Transact")).collect();
         node.pois_per_list(LIST, &items).unwrap()
     };
     println!("inputs: {:?}", status(&blinded_in_hex));
-    println!("outputs: {:?}", status(&blinded_real));
+    println!("outputs: {:?}", status(&blinded_out_hex));
 
     let list_proofs = node.merkle_proofs(LIST, &blinded_in_hex).unwrap();
     let inputs = ProofInputs {
-        txid_proof,
+        txid_proof: trees.proof(position as u64).unwrap(),
         bound_params_hash: fr(&tx.bound_params_hash),
         nullifiers: tx.nullifiers.iter().map(|n| fr(n)).collect(),
         commitments_out: tx.commitments.iter().map(|c| fr(c)).collect(),
@@ -188,7 +163,7 @@ fn main() {
             })
             .collect(),
         utxo_tree_in: tx.utxo_tree_in,
-        outputs: outputs.clone(),
+        outputs,
         global_position_out: start_out,
         list_proofs,
     };
@@ -232,45 +207,18 @@ fn main() {
         "pi_c": dec2(s(&p["pi_c"][0]), s(&p["pi_c"][1])),
     });
     let hex32 = |x: &Fr| hex::encode(field::to_be_bytes(x));
-    let roots: Vec<String> = inputs.list_proofs.iter().map(|l| hex32(&l.root)).collect();
-    let txid_root = hex32(&inputs.txid_proof.root);
-
-    match mode {
-        Some("--transact") => {
-            let data = json!({
-                "snarkProof": snark_proof,
-                "poiMerkleroots": roots,
-                "txidMerkleroot": txid_root,
-                "txidMerklerootIndex": latest,
-                "blindedCommitmentsOut": blinded_out_hex,
-                "railgunTxidIfHasUnshield": "0x00",
-            });
-            node.submit_transact_proof(LIST, data).unwrap();
-        }
-        Some("--single") => {
-            let leaf = hex32(&inputs.txid_proof.leaf);
-            let pois = json!({LIST: {leaf: {
-                "snarkProof": snark_proof,
-                "txidMerkleroot": txid_root,
-                "poiMerkleroots": roots,
-                "blindedCommitmentsOut": blinded_out_hex,
-                "railgunTxidIfHasUnshield": "0x00",
-            }}});
-            for (s, o) in sent.iter().zip(&outputs) {
-                node.submit_single_commitment_proofs(json!({
-                    "commitment": hex::encode(s.commitment),
-                    "npk": hex32(&o.npk),
-                    "utxoTreeIn": tx.utxo_tree_in,
-                    "utxoTreeOut": s.tree,
-                    "utxoPositionOut": s.position,
-                    "railgunTxid": hex32(&txid),
-                    "pois": pois,
-                }))
-                .unwrap();
-            }
-        }
-        _ => return,
+    let data = json!({
+        "snarkProof": snark_proof,
+        "poiMerkleroots": inputs.list_proofs.iter().map(|l| hex32(&l.root)).collect::<Vec<_>>(),
+        "txidMerkleroot": hex32(&inputs.txid_proof.root),
+        "txidMerklerootIndex": latest,
+        "blindedCommitmentsOut": blinded_out_hex,
+        "railgunTxidIfHasUnshield": "0x00",
+    });
+    println!("{data}");
+    if submit {
+        node.submit_transact_proof(LIST, data).unwrap();
+        println!("submitted");
+        println!("outputs now: {:?}", status(&blinded_out_hex));
     }
-    println!("submitted");
-    println!("outputs now: {:?}", status(&blinded_real));
 }

@@ -40,6 +40,12 @@ impl WasmtimeCircuit {
         linker
             .func_wrap("runtime", "showSharedRWMemory", |_: Caller<'_, ()>| {})
             .map_err(err)?;
+        // Debug output from newer circom versions, which nothing here reads.
+        for name in ["printErrorMessage", "writeBufferMessage"] {
+            linker
+                .func_wrap("runtime", name, |_: Caller<'_, ()>| {})
+                .map_err(err)?;
+        }
         let instance = linker.instantiate(&mut store, &self.module).map_err(err)?;
         macro_rules! f {
             ($name:literal) => {

@@ -41,6 +41,12 @@ impl WasmiCircuit {
         linker
             .func_wrap("runtime", "showSharedRWMemory", |_: Caller<'_, ()>| {})
             .map_err(err)?;
+        // Debug output from newer circom versions, which nothing here reads.
+        for name in ["printErrorMessage", "writeBufferMessage"] {
+            linker
+                .func_wrap("runtime", name, |_: Caller<'_, ()>| {})
+                .map_err(err)?;
+        }
         let instance = linker
             .instantiate_and_start(&mut store, &self.module)
             .map_err(err)?;
