@@ -2,3 +2,6 @@
 module_name = "RailgunCore"
 ffi_module_name = "RailgunFFI"
 generate_immutable_records = true
+
+[crates.rg_uniffi.bindings.kotlin]
+package_name = "com.hewigovens.railgun"

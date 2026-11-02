@@ -6,7 +6,7 @@ through UniFFI. See `scope.md` for the plan and milestones, and
 
 ## Status
 
-- Bindings: `crates/rg-uniffi` exposes the API to Swift. See `HANDOFF.md`.
+- Bindings: `crates/rg-uniffi` exposes the API to Swift and Kotlin. See `HANDOFF.md`.
 - API: `crates/rg-core` is what bindings sit on: `Client` with a file store, sync,
   transfers, unshields and POI.
 - M0: `harness/` generates golden vectors from the TS engine

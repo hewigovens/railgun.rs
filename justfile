@@ -27,13 +27,21 @@ lint:
 wallet *args:
   cargo run --release -p rg-core --example wallet -- "$@"
 
-# Swift bindings into build/bindings.
+# Swift and Kotlin bindings into build/bindings.
 ffi:
   bash scripts/ffi.sh
 
 # Also the XCFramework for macOS, iOS and the iOS simulator.
 ffi-apple:
   bash scripts/ffi.sh xcframework
+
+# Also the JNI libraries in build/android/jniLibs. Needs ANDROID_NDK_HOME and cargo-ndk.
+ffi-android:
+  bash scripts/ffi.sh android
+
+# Runs the Kotlin smoke test on the JVM. Needs Gradle. Set RG_MNEMONIC_FILE for the live part.
+test-kotlin: ffi
+  gradle -p crates/rg-uniffi/tests/kotlin run
 
 # Compiles the bindings with the smoke test and runs it. Set RG_MNEMONIC_FILE for the live part.
 test-swift: ffi

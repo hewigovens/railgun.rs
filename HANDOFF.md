@@ -15,7 +15,7 @@ don't say.
 | M4 prove and submit one transfer | done on Arbitrum; the Anon wallet received it |
 | M5 POI | done on Arbitrum: a Rust proof reached `Valid`, Anon shows the funds spendable |
 | Unshield, several inputs | done on Arbitrum, each with POI `Valid` |
-| Bindings | Swift through `rg-uniffi`, run on macOS and an iOS simulator against live Arbitrum |
+| Bindings | Swift on macOS and an iOS simulator, Kotlin on the JVM, Rust on an Android emulator, all against live Arbitrum |
 
 Tests: `cargo test --workspace` gives 67 passed, 2 ignored (the M3 full-history test
 needs Sepolia `data/`, the M4 witness and proof test needs circuit artifacts). Two tests
@@ -77,7 +77,9 @@ not leave a wallet holding these keys open in Railway, or it submits POI first.
 
 `just ffi` writes Swift bindings to `build/bindings`, and `just ffi-apple` also builds `build/RailgunFFI.xcframework` for macOS, iOS and the iOS simulator. `just test-swift` runs `crates/rg-uniffi/tests/swift/main.swift` offline; set `RG_MNEMONIC_FILE`, `RG_RPC`, `RG_DATA`, `RG_FROM`, `RG_RECIPIENT`, `RG_TOKEN` and optionally `RG_POI_TX` to run the live part, which sends nothing.
 
-Android needs the NDK on the machine, because `ring` compiles C: `cargo check --target aarch64-linux-android` fails in its build script here. Kotlin bindings are not generated yet.
+`just ffi` also writes Kotlin bindings (package `com.hewigovens.railgun`), `just ffi-android` builds `build/android/jniLibs` for arm64-v8a and x86_64 at 16 KB page alignment (needs `ANDROID_NDK_HOME` and `cargo-ndk`; NDK 27.3 works), and `just test-kotlin` runs `crates/rg-uniffi/tests/kotlin` on the JVM with the same variables.
+
+Android coverage so far: the `wallet` example, built with the NDK, ran on an Android 16 arm64 emulator against live Arbitrum: sync 2.9 s, transfer with proving 2.9 s, POI 9.9 s with cached circuits and leaves. The Kotlin bindings have not run inside an Android app, so loading `librg_uniffi.so` through JNA on Android is untested. Emulator times come from this M4 Pro, not a phone.
 
 ## Store
 
@@ -150,4 +152,4 @@ The 1x2 zkey has the same hash as the production one.
 - Spending across trees, which needs one transaction per tree.
 - Unshield to native ETH (relay adapt), broadcaster fees, NFTs.
 - Decoding legacy (pre-V2.1) events, so older wallets can scan.
-- Kotlin bindings and an Android build; timings on a real iPhone and Android device.
+- A small Android app to load the bindings through JNA; timings on a real iPhone and Android device.

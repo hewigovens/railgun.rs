@@ -3,3 +3,6 @@ node_modules/
 .test-wallet/
 /data/
 /build/
+.gradle/
+crates/rg-uniffi/tests/kotlin/build/
+.kotlin/

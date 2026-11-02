@@ -30,7 +30,7 @@ Dependency direction, never inverted: `rg-primitives` → `rg-keys`, `rg-notes`,
 
 ## UniFFI
 
-`rg-uniffi` follows JayJay's layout: `uniffi::setup_scaffolding!()` in `lib.rs`, `src/types/` for records, `#[uniffi::remote(...)]` for records owned by core crates, `#[derive(uniffi::Object)]` wrappers around `rg-core` types, and a `uniffi-bindgen.rs` binary behind the `cli` feature. It adds no logic. `u128` does not cross the boundary, so amounts are decimal strings. Calls block, so shells run them off the UI thread. Run `just test-swift` when the surface changes.
+`rg-uniffi` follows JayJay's layout: `uniffi::setup_scaffolding!()` in `lib.rs`, `src/types/` for records, `#[uniffi::remote(...)]` for records owned by core crates, `#[derive(uniffi::Object)]` wrappers around `rg-core` types, and a `uniffi-bindgen.rs` binary behind the `cli` feature. It adds no logic. `u128` does not cross the boundary, so amounts are decimal strings. Calls block, so shells run them off the UI thread. Run `just test-swift` and `just test-kotlin` when the surface changes. Error fields are `reason`, since `message` collides with Kotlin's `Throwable.message`.
 
 ## Version Control
 
@@ -49,6 +49,7 @@ just test-rust <crate> [filter]
 just test
 just test-proof <artifacts>
 just test-swift
+just test-kotlin
 just lint
 just format
 ```

@@ -1,24 +1,24 @@
 use rg_core::Error;
 
-/// A flat error so a shell can branch on the cause. `rg_core::Error` wraps source errors that do not cross the boundary.
+/// A flat error so a shell can branch on the cause. `rg_core::Error` wraps source errors that do not cross the boundary. The field is `reason` because `message` collides with Kotlin's `Throwable.message`.
 #[derive(Debug, thiserror::Error, uniffi::Error)]
 pub enum RailgunError {
-    #[error("{message}")]
-    InvalidInput { message: String },
-    #[error("{message}")]
-    InsufficientFunds { message: String },
-    #[error("{message}")]
-    Network { message: String },
-    #[error("{message}")]
-    Refused { message: String },
-    #[error("{message}")]
-    Internal { message: String },
+    #[error("{reason}")]
+    InvalidInput { reason: String },
+    #[error("{reason}")]
+    InsufficientFunds { reason: String },
+    #[error("{reason}")]
+    Network { reason: String },
+    #[error("{reason}")]
+    Refused { reason: String },
+    #[error("{reason}")]
+    Internal { reason: String },
 }
 
 impl RailgunError {
     pub(crate) fn invalid(message: impl Into<String>) -> Self {
         RailgunError::InvalidInput {
-            message: message.into(),
+            reason: message.into(),
         }
     }
 }
@@ -31,19 +31,19 @@ impl From<rg_keys::Error> for RailgunError {
 
 impl From<Error> for RailgunError {
     fn from(e: Error) -> Self {
-        let message = e.to_string();
+        let reason = e.to_string();
         match e {
-            Error::Keys(_) => RailgunError::InvalidInput { message },
+            Error::Keys(_) => RailgunError::InvalidInput { reason },
             Error::Tx(rg_core::TxError::InsufficientNote(_)) => {
-                RailgunError::InsufficientFunds { message }
+                RailgunError::InsufficientFunds { reason }
             }
             Error::Sync(rg_sync::Error::Rpc(_)) | Error::Node(_) | Error::Download(..) => {
-                RailgunError::Network { message }
+                RailgunError::Network { reason }
             }
             Error::NotProvable(..) | Error::UnknownSeedRoot(_) | Error::NoSquid(_) => {
-                RailgunError::Refused { message }
+                RailgunError::Refused { reason }
             }
-            _ => RailgunError::Internal { message },
+            _ => RailgunError::Internal { reason },
         }
     }
 }

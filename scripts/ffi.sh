@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds rg-uniffi and generates Swift bindings into build/bindings. `xcframework` also wraps macOS, iOS and iOS simulator static libraries.
+# Builds rg-uniffi and generates Swift and Kotlin bindings into build/bindings. `xcframework` also wraps macOS, iOS and iOS simulator static libraries; `android` builds the JNI libraries into build/android/jniLibs.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -17,6 +17,12 @@ target/release/uniffi-bindgen generate \
   --config crates/rg-uniffi/uniffi.toml
 cp "$bindings/RailgunFFI.h" "$headers/"
 cp "$bindings/RailgunFFI.modulemap" "$headers/module.modulemap"
+target/release/uniffi-bindgen generate \
+  --library target/release/librg_uniffi.dylib \
+  --language kotlin \
+  --no-format \
+  --out-dir "$bindings/kotlin" \
+  --config crates/rg-uniffi/uniffi.toml
 
 if [[ "${1:-}" == xcframework ]]; then
   args=(-library "target/release/$lib" -headers "$headers")
@@ -26,4 +32,8 @@ if [[ "${1:-}" == xcframework ]]; then
   done
   rm -rf build/RailgunFFI.xcframework
   xcodebuild -create-xcframework "${args[@]}" -output build/RailgunFFI.xcframework
+fi
+
+if [[ "${1:-}" == android ]]; then
+  cargo ndk -t arm64-v8a -t x86_64 -o build/android/jniLibs build --release -p rg-uniffi --no-default-features
 fi
