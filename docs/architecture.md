@@ -155,7 +155,11 @@ sequenceDiagram
     R->>R: note is spendable
 ```
 
-The contract does not enforce any of this; wallets and broadcasters do. Blinded commitments
+The contract does not enforce any of this; wallets and broadcasters do. `Client::balances`
+asks the aggregator for the status of every unspent note and splits balances the way the
+engine's `getBalanceBucket` does. Transfers and unshields spend only notes it reports
+`Valid`: a pending note would pass on chain, but the POI proof for that transaction could
+not be made, so the recipient's funds would stay pending. Blinded commitments
 are `poseidon(commitment, npk, global position)`, so the list holds no amounts or addresses.
 
 POI artifacts are versioned apart from the engine, and the live aggregator rejects proofs

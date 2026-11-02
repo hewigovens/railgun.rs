@@ -5,6 +5,9 @@ import dev.hewig.railgun.RailgunClient
 import dev.hewig.railgun.RailgunException
 import dev.hewig.railgun.Wallet
 import dev.hewig.railgun.generateMnemonic
+import dev.hewig.railgun.isValidEvmAddress
+import dev.hewig.railgun.isValidMnemonic
+import dev.hewig.railgun.isValidRailgunAddress
 import java.nio.file.Files
 
 class OfflineSmoke {
@@ -14,9 +17,9 @@ class OfflineSmoke {
 
         val secret = words.toSecretBuffer()
         val wallet = secret.useOnce { Wallet.fromMnemonic(it, 0u) }
-        Check.that(wallet.address().startsWith("0zk"), "address is 0zk")
+        val address = wallet.address()
+        Check.that(address.startsWith("0zk"), "address is 0zk")
         Check.that(secret.position(0).let { (0 until it.limit()).all { i -> it.get(i) == 0.toByte() } }, "buffer is wiped")
-        wallet.close()
 
         Check.raises<RailgunException.InvalidInput>("bad mnemonic") {
             "not a mnemonic".toByteArray().toSecretBuffer().useOnce { Wallet.fromMnemonic(it, 0u) }
@@ -27,7 +30,16 @@ class OfflineSmoke {
 
         val test = "test test test test test test test test test test test junk"
         val account = test.toByteArray().toSecretBuffer().useOnce { EvmAccount.fromMnemonic(it, 0u) }
-        Check.that(account.address() == "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266", "standard EVM account")
+        Check.that(account.address() == "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266", "standard EVM account, checksummed")
+
+        Check.that(test.toByteArray().toSecretBuffer().useOnce { isValidMnemonic(it) }, "valid mnemonic")
+        val badChecksum = "test test test test test test test test test test test test"
+        Check.that(!badChecksum.toByteArray().toSecretBuffer().useOnce { isValidMnemonic(it) }, "bad checksum")
+        Check.that(isValidRailgunAddress(address), "valid 0zk address")
+        Check.that(!isValidRailgunAddress("0zk1qy"), "truncated 0zk address")
+        Check.that(isValidEvmAddress(account.address()), "valid EVM address")
+        Check.that(isValidEvmAddress(account.address().lowercase()), "lowercase EVM address")
+        Check.that(!isValidEvmAddress(account.address().replace('F', 'f')), "bad EIP-55 checksum")
 
         val dataDir = Files.createTempDirectory("rg-smoke").toString()
         Check.raises<RailgunException.InvalidInput>("unknown network") {
@@ -35,6 +47,9 @@ class OfflineSmoke {
         }
 
         val client = RailgunClient.open("arbitrum", "http://localhost:1", dataDir)
+        Check.that(client.balances(wallet).isEmpty(), "a new wallet has no balance")
+        Check.that(client.history(wallet).isEmpty(), "a new wallet has no history")
+        wallet.close()
         Check.raises<RailgunException.Network>("no node") {
             client.sync()
         }

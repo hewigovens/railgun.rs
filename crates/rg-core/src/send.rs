@@ -1,15 +1,15 @@
 use rand::RngCore;
-use rg_keys::{EvmKey, decode_address};
+use rg_keys::{EvmAddress, EvmKey, decode_address};
 use rg_sync::rpc::Receipt;
 use rg_tx::{Eip1559Tx, approve_calldata, shield_calldata};
 
-use crate::{ChainStore, Client, Error, UnsignedTx};
+use crate::{ChainStore, Client, Error, FeeQuote, UnsignedTx};
 
 fn address(value: &str) -> Result<[u8; 20], Error> {
-    hex::decode(value.trim_start_matches("0x"))
-        .ok()
-        .and_then(|bytes| bytes.try_into().ok())
-        .ok_or_else(|| Error::BadAddress(value.to_string()))
+    value
+        .parse::<EvmAddress>()
+        .map(|a| a.0)
+        .map_err(|e| Error::BadAddress(format!("{value}: {e}")))
 }
 
 /// Public tokens into the pool. `value` is what leaves the sender; the contract keeps its fee, so `receiver` gets slightly less.
@@ -55,20 +55,22 @@ impl<S: ChainStore> Client<S> {
         Ok(self.rpc.native_balance(owner)?)
     }
 
-    /// Signs and sends, and returns the hash without waiting. The node's estimate moves with the L1 fee on rollups, so the limit gets a margin; unused gas is refunded.
-    pub fn send(&self, key: &EvmKey, tx: &UnsignedTx) -> Result<[u8; 32], Error> {
+    pub(crate) fn check_chain(&self, tx: &UnsignedTx) -> Result<(), Error> {
         if tx.chain_id != self.network.chain_id {
             return Err(Error::WrongChain(tx.chain_id, self.network.chain_id));
         }
-        let from = key.address();
-        let estimate = self.estimate_gas(&format!("0x{}", hex::encode(from)), tx)?;
-        let priority = self.rpc.priority_fee()?;
+        Ok(())
+    }
+
+    /// Signs with the quoted fees and sends, and returns the hash without waiting.
+    pub fn send(&self, key: &EvmKey, tx: &UnsignedTx, fee: &FeeQuote) -> Result<[u8; 32], Error> {
+        self.check_chain(tx)?;
         let signed = Eip1559Tx {
             chain_id: tx.chain_id,
-            nonce: self.rpc.nonce(&from)?,
-            max_priority_fee_per_gas: priority,
-            max_fee_per_gas: self.rpc.base_fee()? * 2 + priority,
-            gas_limit: estimate + estimate / 5,
+            nonce: self.rpc.nonce(&key.address())?,
+            max_priority_fee_per_gas: fee.max_priority_fee_per_gas,
+            max_fee_per_gas: fee.max_fee_per_gas,
+            gas_limit: fee.gas_limit,
             to: address(&tx.to)?,
             data: tx.data.clone(),
         }

@@ -1,7 +1,7 @@
 use rg_keys::WalletKeys;
 use rg_primitives::field;
 use rg_sync::squid;
-use rg_wallet::{ScanResult, Scanner};
+use rg_wallet::{HistoryEntry, ScanResult, Scanner};
 
 use crate::{ChainStore, Client, Error};
 
@@ -88,5 +88,10 @@ impl<S: ChainStore> Client<S> {
 
     pub fn scan(&self, keys: &WalletKeys) -> ScanResult {
         Scanner::new(keys).scan(&self.state)
+    }
+
+    /// Shields, receipts, sends and unshields as of the last sync, newest first.
+    pub fn history(&self, keys: &WalletKeys) -> Vec<HistoryEntry> {
+        self.scan(keys).history(&keys.master_public_key)
     }
 }

@@ -6,6 +6,7 @@ import dev.hewig.railgun.RailgunException
 import dev.hewig.railgun.UnsignedTx
 import dev.hewig.railgun.Wallet
 import java.io.File
+import java.math.BigInteger
 
 /** Runs against a live node when `RG_MNEMONIC_FILE` is set. Sends only with `RG_SEND_KEY_FILE`, so point `RG_RPC` at a fork for that. */
 class LiveSmoke private constructor(
@@ -26,14 +27,18 @@ class LiveSmoke private constructor(
 
         val balances = client.balances(wallet)
         println("balances: $balances")
-        Check.that(balances.isNotEmpty(), "the test wallet has a balance")
+        Check.that(balances.any { it.spendable != "0" }, "the test wallet has a spendable balance")
+        val history = client.history(wallet)
+        println("history: ${history.size} items, latest ${history.firstOrNull()}")
+        Check.that(history.isNotEmpty(), "the test wallet has history")
 
         Check.raises<RailgunException.InsufficientFunds>("too much") {
             client.transfer(wallet, "999999999999999999999")
         }
         val transaction = client.transfer(wallet, "1000000000000")
         println("transfer: ${transaction.data.size} bytes on chain ${transaction.chainId}")
-        println("gas: ${client.estimateGas(environment.getValue("RG_FROM"), transaction)}")
+        val fee = client.quoteFee(environment.getValue("RG_FROM"), transaction)
+        println("fee: gas limit ${fee.gasLimit()}, expected ${fee.expectedCost()} wei, at most ${fee.maxCost()} wei")
 
         environment["RG_SEND_KEY_FILE"]?.let { send(client, wallet, transaction, it) }
         println("live checks passed")
@@ -47,12 +52,18 @@ class LiveSmoke private constructor(
             client.sendAndWait(account, client.buildApprove(token, value))
         }
         client.sendAndWait(account, client.buildShield(wallet.address(), token, value))
+        client.sync()
+        val balance = client.balances(wallet).first { it.token == token }
+        Check.that(balance.shieldPending != "0", "the new shield waits for POI")
+        Check.raises<RailgunException.PendingPoi>("pending notes are not spent") {
+            client.transfer(wallet, (balance.spendable.toBigInteger() + BigInteger.ONE).toString())
+        }
         client.sendAndWait(account, transfer)
         println("send checks passed")
     }
 
     private fun RailgunClient.sendAndWait(account: EvmAccount, transaction: UnsignedTx) {
-        val hash = send(account, transaction)
+        val hash = send(account, transaction, quoteFee(account.address(), transaction))
         val receipt = (1..120).firstNotNullOfOrNull { receipt(hash) ?: null.also { Thread.sleep(1000) } }
         println("$hash: $receipt")
         Check.that(receipt?.success == true, "transaction succeeded")

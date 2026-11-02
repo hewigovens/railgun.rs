@@ -18,7 +18,15 @@ struct OfflineSmoke {
 
         let test = Data("test test test test test test test test test test test junk".utf8)
         let account = try EvmAccount.fromMnemonic(mnemonic: test, index: 0)
-        Check.that(account.address() == "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266", "standard EVM account")
+        Check.that(account.address() == "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266", "standard EVM account, checksummed")
+
+        Check.that(isValidMnemonic(mnemonic: test), "valid mnemonic")
+        Check.that(!isValidMnemonic(mnemonic: Data("test test test test test test test test test test test test".utf8)), "bad checksum")
+        try Check.that(isValidRailgunAddress(address: wallet.address()), "valid 0zk address")
+        Check.that(!isValidRailgunAddress(address: "0zk1qy"), "truncated 0zk address")
+        Check.that(isValidEvmAddress(address: account.address()), "valid EVM address")
+        Check.that(isValidEvmAddress(address: account.address().lowercased()), "lowercase EVM address")
+        Check.that(!isValidEvmAddress(address: account.address().replacingOccurrences(of: "F", with: "f")), "bad EIP-55 checksum")
 
         let dataDir = NSTemporaryDirectory() + "rg-smoke-\(UUID().uuidString)"
         try Check.raises(RailgunError.self, where: \.isInvalidInput, "unknown network") {
@@ -26,7 +34,8 @@ struct OfflineSmoke {
         }
 
         let client = try RailgunClient.open(network: "arbitrum", rpcUrl: "http://localhost:1", dataDir: dataDir)
-        Check.that(client.balances(wallet: wallet).isEmpty, "a new wallet has no balance")
+        try Check.that(client.balances(wallet: wallet).isEmpty, "a new wallet has no balance")
+        Check.that(client.history(wallet: wallet).isEmpty, "a new wallet has no history")
         try Check.raises(RailgunError.self, where: \.isNetwork, "no node") {
             try client.sync()
         }

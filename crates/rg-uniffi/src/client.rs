@@ -2,15 +2,23 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use rg_core::{Artifacts, Client, FileStore, Receipt, Shield, Transfer, Unshield, UnsignedTx};
+use rg_keys::EvmAddress;
 use rg_sync::Network;
 
-use crate::{EvmAccount, PoiSubmission, RailgunError, SyncReport, TokenBalance, Wallet};
+use crate::{
+    EvmAccount, FeeQuote, HistoryItem, PoiSubmission, RailgunError, SyncReport, TokenBalance,
+    Wallet,
+};
 
-fn hex_bytes<const N: usize>(value: &str) -> Result<[u8; N], RailgunError> {
+fn hash(value: &str) -> Result<[u8; 32], RailgunError> {
     hex::decode(value.trim_start_matches("0x"))
         .ok()
         .and_then(|bytes| bytes.try_into().ok())
-        .ok_or_else(|| RailgunError::invalid(format!("expected {N} hex bytes: {value}")))
+        .ok_or_else(|| RailgunError::invalid(format!("expected a 32-byte hash: {value}")))
+}
+
+fn address(value: &str) -> Result<[u8; 20], RailgunError> {
+    Ok(value.parse::<EvmAddress>()?.0)
 }
 
 fn amount(value: &str) -> Result<u128, RailgunError> {
@@ -55,17 +63,16 @@ impl RailgunClient {
         Ok(self.client().sync()?)
     }
 
-    /// Unspent ERC20 balances as of the last sync. Token addresses are lowercase hex.
-    pub fn balances(&self, wallet: &Wallet) -> Vec<TokenBalance> {
-        self.client()
-            .scan(&wallet.keys)
-            .balances()
-            .into_iter()
-            .map(|(token, value)| TokenBalance {
-                token: format!("0x{}", hex::encode(&token[12..])),
-                value: value.to_string(),
-            })
-            .collect()
+    /// Unspent ERC20 balances as of the last sync, by POI status, which comes from the aggregator. Token addresses are checksummed.
+    pub fn balances(&self, wallet: &Wallet) -> Result<Vec<TokenBalance>, RailgunError> {
+        let balances = self.client().balances(&wallet.keys)?;
+        Ok(balances.into_iter().map(TokenBalance::from).collect())
+    }
+
+    /// Shields, receipts, sends and unshields as of the last sync, newest first. Change is left out.
+    pub fn history(&self, wallet: &Wallet) -> Vec<HistoryItem> {
+        let history = self.client().history(&wallet.keys);
+        history.into_iter().map(HistoryItem::from).collect()
     }
 
     pub fn build_transfer(
@@ -78,7 +85,7 @@ impl RailgunClient {
     ) -> Result<UnsignedTx, RailgunError> {
         let transfer = Transfer {
             recipient: &recipient,
-            token: hex_bytes(&token)?,
+            token: address(&token)?,
             value: amount(&value)?,
             memo: memo.as_deref(),
         };
@@ -95,8 +102,8 @@ impl RailgunClient {
         value: String,
     ) -> Result<UnsignedTx, RailgunError> {
         let unshield = Unshield {
-            to: hex_bytes(&to)?,
-            token: hex_bytes(&token)?,
+            to: address(&to)?,
+            token: address(&token)?,
             value: amount(&value)?,
         };
         Ok(self
@@ -113,7 +120,7 @@ impl RailgunClient {
     ) -> Result<UnsignedTx, RailgunError> {
         let shield = Shield {
             receiver: &receiver,
-            token: hex_bytes(&token)?,
+            token: address(&token)?,
             value: amount(&value)?,
         };
         Ok(self.client().build_shield(&shield)?)
@@ -123,44 +130,48 @@ impl RailgunClient {
     pub fn build_approve(&self, token: String, value: String) -> Result<UnsignedTx, RailgunError> {
         Ok(self
             .client()
-            .build_approve(hex_bytes(&token)?, amount(&value)?)?)
+            .build_approve(address(&token)?, amount(&value)?)?)
     }
 
     /// What the Railgun contract may take of `owner`'s `token`.
     pub fn allowance(&self, owner: String, token: String) -> Result<String, RailgunError> {
         let allowance = self
             .client()
-            .allowance(&hex_bytes(&owner)?, &hex_bytes(&token)?)?;
+            .allowance(&address(&owner)?, &address(&token)?)?;
         Ok(allowance.to_string())
     }
 
     pub fn token_balance(&self, owner: String, token: String) -> Result<String, RailgunError> {
         let balance = self
             .client()
-            .token_balance(&hex_bytes(&token)?, &hex_bytes(&owner)?)?;
+            .token_balance(&address(&token)?, &address(&owner)?)?;
         Ok(balance.to_string())
     }
 
     pub fn native_balance(&self, owner: String) -> Result<String, RailgunError> {
-        Ok(self
-            .client()
-            .native_balance(&hex_bytes(&owner)?)?
-            .to_string())
+        Ok(self.client().native_balance(&address(&owner)?)?.to_string())
     }
 
-    pub fn estimate_gas(&self, from: String, tx: UnsignedTx) -> Result<u64, RailgunError> {
-        Ok(self.client().estimate_gas(&from, &tx)?)
+    /// Estimates and prices sending `tx` from the `from` address, which needs no key. Fails if the node expects it to revert.
+    pub fn quote_fee(&self, from: String, tx: UnsignedTx) -> Result<Arc<FeeQuote>, RailgunError> {
+        let quote = self.client().quote_fee(&address(&from)?, &tx)?;
+        Ok(Arc::new(FeeQuote { quote }))
     }
 
-    /// Signs `tx` with `account`, which pays the gas, and sends it. Returns the transaction hash at once; poll `receipt` for the result. The account is public, and it shows on chain as the sender.
-    pub fn send(&self, account: &EvmAccount, tx: UnsignedTx) -> Result<String, RailgunError> {
-        let hash = self.client().send(&account.key, &tx)?;
+    /// Signs `tx` with `account` at the quoted fees, and sends it. Returns the transaction hash at once; poll `receipt` for the result. The account is public, and it shows on chain as the sender.
+    pub fn send(
+        &self,
+        account: &EvmAccount,
+        tx: UnsignedTx,
+        fee: &FeeQuote,
+    ) -> Result<String, RailgunError> {
+        let hash = self.client().send(&account.key, &tx, &fee.quote)?;
         Ok(format!("0x{}", hex::encode(hash)))
     }
 
     /// None until the transaction is mined.
     pub fn receipt(&self, tx_hash: String) -> Result<Option<Receipt>, RailgunError> {
-        Ok(self.client().receipt(&hex_bytes(&tx_hash)?)?)
+        Ok(self.client().receipt(&hash(&tx_hash)?)?)
     }
 
     /// Proves POI for a sent transaction. Sync past it first.
@@ -169,9 +180,9 @@ impl RailgunClient {
         wallet: &Wallet,
         tx_hash: String,
     ) -> Result<Arc<PoiSubmission>, RailgunError> {
-        let proof =
-            self.client()
-                .prove_poi(&wallet.keys, &hex_bytes(&tx_hash)?, &self.artifacts)?;
+        let proof = self
+            .client()
+            .prove_poi(&wallet.keys, &hash(&tx_hash)?, &self.artifacts)?;
         Ok(Arc::new(PoiSubmission { proof }))
     }
 

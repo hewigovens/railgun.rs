@@ -22,4 +22,12 @@ extension RailgunError {
             false
         }
     }
+
+    var isPendingPoi: Bool {
+        if case .PendingPoi = self {
+            true
+        } else {
+            false
+        }
+    }
 }

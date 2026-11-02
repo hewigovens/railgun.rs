@@ -2,10 +2,10 @@ use std::fmt;
 
 use bip32::{DerivationPath, XPrv};
 use k256::ecdsa::SigningKey;
-use tiny_keccak::{Hasher, Keccak};
 use zeroize::Zeroizing;
 
 use crate::Error;
+use crate::evm_address::{EvmAddress, keccak256};
 use crate::keys::mnemonic_to_seed;
 
 /// A public Ethereum account for paying gas, wiped on drop. Keep it apart from [`crate::WalletKeys`]: everything it sends is public.
@@ -39,10 +39,7 @@ impl EvmKey {
 
     pub fn address(&self) -> [u8; 20] {
         let point = self.0.verifying_key().to_encoded_point(false);
-        let mut hash = [0u8; 32];
-        let mut keccak = Keccak::v256();
-        keccak.update(&point.as_bytes()[1..]);
-        keccak.finalize(&mut hash);
+        let hash = keccak256(&point.as_bytes()[1..]);
         let mut address = [0u8; 20];
         address.copy_from_slice(&hash[12..]);
         address
@@ -69,7 +66,7 @@ impl EvmKey {
 
 impl fmt::Debug for EvmKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "EvmKey(0x{:02x?})", self.address())
+        write!(f, "EvmKey({})", EvmAddress(self.address()))
     }
 }
 

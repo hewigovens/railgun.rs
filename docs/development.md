@@ -84,11 +84,12 @@ key file holding one `0x` hex private key, and `$RECIPIENT` a 0zk address:
 W="cargo run --release -p rg-core --example wallet -- arbitrum https://arb1.arbitrum.io/rpc data/chain <mnemonic-file>"
 WETH=0x82aF49447D8a07e3bd95BD0d56f35241523fBab1
 $W sync
-$W balance
+$W balance                                # by POI status, from the aggregator
+$W history
 $W shield <evm-key-file> $WETH <value>   # approves if needed, then shields to this wallet
 $W transfer $RECIPIENT $WETH <value> > transfer.jsonl
 $W unshield <to> $WETH <value> > transfer.jsonl   # instead of transfer
-$W estimate <from> transfer.jsonl
+$W estimate <from> transfer.jsonl         # fee quote
 $W send <evm-key-file> transfer.jsonl
 $W sync
 $W poi <tx hash> --submit

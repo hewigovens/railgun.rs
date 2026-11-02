@@ -7,6 +7,7 @@ use rg_tx::{
     TransferParams, TransferRequest, UnshieldRequest, chain_full_network_id, plan_transfer,
     plan_unshield, transact_calldata,
 };
+use rg_wallet::ScanResult;
 
 use crate::{Artifacts, ChainStore, Client, Error};
 
@@ -78,9 +79,10 @@ impl<S: ChainStore> Client<S> {
             chain_id: chain_full_network_id(0, self.network.chain_id),
             min_gas_price: 0,
         };
-        let mut rng = rand::rngs::OsRng;
-        let params = plan_transfer(keys, &self.state, &self.scan(keys), &request, |b| {
-            rng.fill_bytes(b)
+        let params = self.plan(keys, &request.token_hash, request.value, |scan| {
+            plan_transfer(keys, &self.state, scan, &request, |b| {
+                rand::rngs::OsRng.fill_bytes(b)
+            })
         })?;
         self.prove_transaction(keys, &params, artifacts)
     }
@@ -100,11 +102,35 @@ impl<S: ChainStore> Client<S> {
             chain_id: chain_full_network_id(0, self.network.chain_id),
             min_gas_price: 0,
         };
-        let mut rng = rand::rngs::OsRng;
-        let params = plan_unshield(keys, &self.state, &self.scan(keys), &request, |b| {
-            rng.fill_bytes(b)
+        let token_hash = rg_notes::TokenData::erc20(unshield.token).hash();
+        let params = self.plan(keys, &token_hash, unshield.value, |scan| {
+            plan_unshield(keys, &self.state, scan, &request, |b| {
+                rand::rngs::OsRng.fill_bytes(b)
+            })
         })?;
         self.prove_transaction(keys, &params, artifacts)
+    }
+
+    /// Plans against spendable notes only. When notes still waiting for POI would have covered `value`, says so rather than reporting a shortfall.
+    fn plan<'a>(
+        &self,
+        keys: &WalletKeys,
+        token_hash: &[u8; 32],
+        value: u128,
+        plan: impl FnOnce(&ScanResult) -> Result<TransferParams<'a>, rg_tx::Error>,
+    ) -> Result<TransferParams<'a>, Error> {
+        let spendable = self.spendable_scan(keys)?;
+        match plan(&spendable) {
+            Err(rg_tx::Error::InsufficientNote(_)) => {
+                let of = |scan: &ScanResult| scan.balances().get(token_hash).copied().unwrap_or(0);
+                if of(&spendable) < value && value <= of(&self.scan(keys)) {
+                    Err(Error::AwaitingPoi(value))
+                } else {
+                    Err(rg_tx::Error::InsufficientNote(value).into())
+                }
+            }
+            planned => Ok(planned?),
+        }
     }
 
     fn prove_transaction(

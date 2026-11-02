@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use rg_keys::EvmKey;
+use rg_keys::{EvmAddress, EvmKey};
 
 use crate::RailgunError;
 
@@ -31,7 +31,8 @@ impl EvmAccount {
         Ok(Arc::new(EvmAccount { key }))
     }
 
+    /// EIP-55 checksummed.
     pub fn address(&self) -> String {
-        format!("0x{}", hex::encode(self.key.address()))
+        EvmAddress(self.key.address()).to_string()
     }
 }

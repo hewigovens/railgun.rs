@@ -10,6 +10,7 @@ use rg_poi::{
 use rg_primitives::{Fr, field};
 use rg_sync::squid::{SquidTransaction, fetch_transaction, fetch_transactions_after};
 use rg_tree::TREE_CAPACITY;
+use rg_wallet::Txo;
 use serde_json::{Value, json};
 
 use crate::transfer::prove;
@@ -48,8 +49,15 @@ fn leaf(t: &SquidTransaction) -> Fr {
     txid_leaf(&txid, t.utxo_tree_in, out)
 }
 
+/// The blinded commitment the aggregator files a note under: `poseidon(commitment, npk, global position)`.
+pub(crate) fn blinded_input(keys: &WalletKeys, t: &Txo) -> String {
+    let npk = note_public_key(&keys.master_public_key, &t.random);
+    let at = global_tree_position(t.tree, t.position);
+    blinded_hex(&blinded_commitment(&fr(&t.commitment), &npk, at))
+}
+
 impl<S: ChainStore> Client<S> {
-    fn node(&self) -> Node {
+    pub(crate) fn node(&self) -> Node {
         Node::new(AGGREGATOR, self.network.chain_id)
     }
 
@@ -125,14 +133,7 @@ impl<S: ChainStore> Client<S> {
         let spent = scan
             .txos_for_nullifiers(tx.utxo_tree_in, &tx.nullifiers)
             .ok_or_else(|| unprovable("a spent note is not ours"))?;
-        let blinded_in: Vec<String> = spent
-            .iter()
-            .map(|t| {
-                let npk = note_public_key(&keys.master_public_key, &t.random);
-                let at = global_tree_position(t.tree, t.position);
-                blinded_hex(&blinded_commitment(&fr(&t.commitment), &npk, at))
-            })
-            .collect();
+        let blinded_in: Vec<String> = spent.iter().map(|t| blinded_input(keys, t)).collect();
 
         let notes_out = &tx.commitments[..tx.commitments.len() - usize::from(tx.has_unshield)];
         let start = tx.utxo_batch_start_position_out;

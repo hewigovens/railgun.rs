@@ -17,10 +17,15 @@ example is a command line over the API.
 - Keys from a BIP39 mnemonic, 0zk addresses, and a separate EVM account that pays gas.
 - Sync from an RPC node, with the Railgun squid seeding pre-2023 leaves on mainnets and
   every root checked against the contract.
-- Scanning and decryption of your notes, spent status and balances.
+- Scanning and decryption of your notes, spent status, and history: shields, receipts,
+  sends and unshields.
+- Balances split by POI status (spendable, shield pending, missing POI and so on), from
+  the POI aggregator.
 - Private transfers and unshields, with several inputs from one tree, proved in Rust.
+  They spend only notes whose POI is valid, as the TS SDK does.
 - POI proofs, submitted to the aggregator, so recipients can spend what they receive.
-- Shielding ERC-20 tokens, and EIP-1559 signing and sending.
+- Shielding ERC-20 tokens, fee quotes, and EIP-1559 signing and sending.
+- Checks for mnemonics, 0zk addresses and EIP-55 checksummed `0x` addresses.
 - Ethereum, Arbitrum and Sepolia.
 
 Checked against `@railgun-community/engine` 9.6.0 with its randomness pinned: keys,
@@ -61,19 +66,22 @@ let keys = WalletKeys::from_mnemonic(&mnemonic, "", 0)?;
 let store = FileStore::open("data/arbitrum")?;
 let mut client = Client::open(Network::ARBITRUM, "https://arb1.arbitrum.io/rpc", store)?;
 client.sync()?;
-let balances = client.scan(&keys).balances();
+let balances = client.balances(&keys)?; // per token, by POI status
+let history = client.history(&keys);
 
 let transfer = Transfer { recipient: "0zk1...", token: weth, value: 10_000_000_000_000, memo: None };
 let tx = client.build_transfer(&keys, &transfer, &Artifacts::new("data/artifacts"))?;
 let gas = EvmKey::from_mnemonic(&mnemonic, "", 0)?;
-let hash = client.send(&gas, &tx)?;
+let fee = client.quote_fee(&gas.address(), &tx)?; // show fee.max_cost() before sending
+let hash = client.send(&gas, &tx, &fee)?;
 ```
 
-The first sync on a mainnet seeds old leaves from the squid. Circuit artifacts download the first time a proof needs them. After a transfer
-is mined, `client.prove_poi` and `client.submit_poi` give it POI.
+The first sync on a mainnet seeds old leaves from the squid. Circuit artifacts download
+the first time a proof needs them. After a transfer is mined, `client.prove_poi` and
+`client.submit_poi` give it POI.
 
-`crates/rg-core/examples/wallet.rs` covers `sync`, `balance`, `transfer`, `unshield`,
-`shield`, `send` and `poi`:
+`crates/rg-core/examples/wallet.rs` covers `sync`, `balance`, `history`, `transfer`,
+`unshield`, `shield`, `estimate`, `send` and `poi`:
 
 ```sh
 cargo run --release -p rg-core --example wallet -- arbitrum <rpc url> <data dir> <mnemonic file> balance
@@ -127,6 +135,9 @@ again on every load.
   `poseidon(ourMPK, random)`; the engine keeps any shield whose random decrypts. Such a
   note could not be spent.
 - `rg_tx::select_notes` spends from one tree, up to 10 notes.
+- History is simpler than the SDK's: shields, receipts, sends and unshields per token and
+  transaction. Change and transfers to yourself are left out, and an unshield's value is
+  what it took from the wallet, before the contract's fee.
 - `rg_prover::Circuit::prove` checks the witness length against the zkey's variable
   count; ark-circom's matrices count one witness variable too many.
 

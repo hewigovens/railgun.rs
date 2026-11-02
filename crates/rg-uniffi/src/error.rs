@@ -7,6 +7,9 @@ pub enum RailgunError {
     InvalidInput { reason: String },
     #[error("{reason}")]
     InsufficientFunds { reason: String },
+    /// Enough of the token is there, but some of it is still waiting for POI.
+    #[error("{reason}")]
+    PendingPoi { reason: String },
     #[error("{reason}")]
     Network { reason: String },
     #[error("{reason}")]
@@ -39,6 +42,7 @@ impl From<Error> for RailgunError {
             Error::Tx(rg_core::TxError::InsufficientNote(_)) => {
                 RailgunError::InsufficientFunds { reason }
             }
+            Error::AwaitingPoi(_) => RailgunError::PendingPoi { reason },
             Error::Sync(rg_sync::Error::Rpc(_)) | Error::Node(_) | Error::Download(..) => {
                 RailgunError::Network { reason }
             }

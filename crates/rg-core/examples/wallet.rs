@@ -3,11 +3,12 @@
 //! cargo run --release -p rg-core --example wallet -- <network> <rpc url> <data dir> <mnemonic-file> <command>
 //!
 //!   sync
-//!   balance
+//!   balance                                           by POI status, from the aggregator
+//!   history
 //!   transfer <recipient 0zk> <token> <value> [memo]   prints the call as JSON
 //!   unshield <to> <token> <value>                     prints the same
-//!   estimate <from> <transaction json>
-//!   send <evm key file> <transaction json>           signs, sends and waits
+//!   estimate <from> <transaction json>               prints the fee quote
+//!   send <evm key file> <transaction json>           quotes, signs, sends and waits
 //!   shield <evm key file> <token> <value>             approves if needed, then shields to this wallet
 //!
 //! An EVM key file holds one `0x` hex private key. That account pays gas and is public.
@@ -20,7 +21,7 @@ use std::path::Path;
 use rg_core::{
     Artifacts, ChainStore, Client, FileStore, Receipt, Shield, Transfer, Unshield, UnsignedTx,
 };
-use rg_keys::{EvmKey, WalletKeys, Zeroizing};
+use rg_keys::{EvmAddress, EvmKey, WalletKeys, Zeroizing};
 use rg_sync::Network;
 
 /// Reads a `0x` hex private key file.
@@ -37,7 +38,9 @@ fn send_and_wait<S: ChainStore>(
     key: &EvmKey,
     tx: &UnsignedTx,
 ) -> Result<Receipt, Box<dyn std::error::Error>> {
-    let hash = client.send(key, tx)?;
+    let fee = client.quote_fee(&key.address(), tx)?;
+    println!("{fee:?}, at most {} wei", fee.max_cost());
+    let hash = client.send(key, tx, &fee)?;
     println!("0x{}", hex::encode(hash));
     for _ in 0..120 {
         if let Some(receipt) = client.receipt(&hash)? {
@@ -51,6 +54,49 @@ fn send_and_wait<S: ChainStore>(
         std::thread::sleep(std::time::Duration::from_secs(1));
     }
     Err("no receipt after two minutes".into())
+}
+
+/// Reads a call that `transfer` or `unshield` printed.
+fn read_tx(path: &str, chain_id: u64) -> Result<UnsignedTx, Box<dyn std::error::Error>> {
+    let tx: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(path)?)?;
+    let data = tx["data"].as_str().ok_or("no data")?;
+    Ok(UnsignedTx {
+        chain_id,
+        to: tx["to"].as_str().ok_or("no to")?.to_string(),
+        data: hex::decode(data.trim_start_matches("0x"))?,
+    })
+}
+
+fn token(hash: &[u8; 32]) -> Result<EvmAddress, Box<dyn std::error::Error>> {
+    Ok(EvmAddress(hash[12..].try_into()?))
+}
+
+fn print_balances<S: ChainStore>(
+    client: &Client<S>,
+    keys: &WalletKeys,
+) -> Result<(), Box<dyn std::error::Error>> {
+    for b in client.balances(keys)? {
+        println!("{} {b:?}", token(&b.token_hash)?);
+    }
+    Ok(())
+}
+
+fn print_history<S: ChainStore>(
+    client: &Client<S>,
+    keys: &WalletKeys,
+) -> Result<(), Box<dyn std::error::Error>> {
+    for e in client.history(keys) {
+        let memo = e.memo.as_deref().unwrap_or("");
+        println!(
+            "{} 0x{} {:?} {} {} {memo}",
+            e.block_number,
+            hex::encode(e.transaction_hash),
+            e.kind,
+            token(&e.token_hash)?,
+            e.value
+        );
+    }
+    Ok(())
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -69,9 +115,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let address = |s: &str| -> Result<[u8; 20], Box<dyn std::error::Error>> {
-        hex::decode(s.trim_start_matches("0x"))?
-            .try_into()
-            .map_err(|_| "expected 20 bytes".into())
+        Ok(s.parse::<EvmAddress>()?.0)
     };
     let print_tx = |tx: &UnsignedTx| {
         println!(
@@ -82,11 +126,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match a[5].as_str() {
         "sync" => println!("{:?}", client.sync()?),
-        "balance" => {
-            for (token, value) in client.scan(&keys).balances() {
-                println!("0x{} {value}", hex::encode(&token[12..]));
-            }
-        }
+        "balance" => print_balances(&client, &keys)?,
+        "history" => print_history(&client, &keys)?,
         "transfer" => {
             let tx = client.build_transfer(
                 &keys,
@@ -129,30 +170,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         "send" => {
             // send <evm-key-file> <tx.jsonl>, from `transfer` or `unshield`.
-            let key = evm_key(&a[6])?;
-            let tx: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&a[7])?)?;
-            let data = tx["data"].as_str().ok_or("no data")?;
-            let tx = UnsignedTx {
-                chain_id: network.chain_id,
-                to: tx["to"].as_str().ok_or("no to")?.to_string(),
-                data: hex::decode(data.trim_start_matches("0x"))?,
-            };
-            send_and_wait(&client, &key, &tx)?;
+            let tx = read_tx(&a[7], network.chain_id)?;
+            send_and_wait(&client, &evm_key(&a[6])?, &tx)?;
         }
         "estimate" => {
-            let tx: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&a[7])?)?;
-            let data = hex::decode(
-                tx["data"]
-                    .as_str()
-                    .ok_or("no data")?
-                    .trim_start_matches("0x"),
-            )?;
-            let tx = UnsignedTx {
-                chain_id: network.chain_id,
-                to: network.proxy.to_string(),
-                data,
-            };
-            println!("{} gas", client.estimate_gas(&a[6], &tx)?);
+            let tx = read_tx(&a[7], network.chain_id)?;
+            println!("{:?}", client.quote_fee(&address(&a[6])?, &tx)?);
         }
         "poi" => {
             let flag = a.get(7).map(String::as_str);

@@ -53,6 +53,13 @@ pub fn mnemonic_to_seed(mnemonic: &str, password: &str) -> Result<Zeroizing<[u8;
     Ok(Zeroizing::new(m.to_seed_normalized(password)))
 }
 
+/// Checks the words and the checksum without deriving the seed, which is slow.
+pub fn validate_mnemonic(mnemonic: &str) -> Result<(), Error> {
+    bip39::Mnemonic::parse_normalized(mnemonic)
+        .map(drop)
+        .map_err(|e| Error::InvalidMnemonic(e.to_string()))
+}
+
 /// A fresh 12-word mnemonic from the OS random source.
 pub fn generate_mnemonic() -> Zeroizing<String> {
     let mut entropy = Zeroizing::new([0u8; 16]);

@@ -32,6 +32,8 @@ pub enum Error {
     BadAddress(String),
     #[error("transaction is for chain {0}, this client is on chain {1}")]
     WrongChain(u64, u64),
+    #[error("{0} of this token is waiting for POI, so the spendable notes do not cover it yet")]
+    AwaitingPoi(u128),
     #[error("transaction {0} is not one this wallet can prove: {1}")]
     NotProvable(String, &'static str),
 }
