@@ -106,6 +106,12 @@ Timings for one 1x2 transfer on this machine (4-core 2.1 GHz Xeon, release):
 | prove, `parallel` (4 threads) | 0.19 s |
 | prove, snarkjs in Node (for comparison) | 1.4 to 1.6 s |
 
+## Mainnet and POI
+
+`fetch_leaves` and `fetch_logs` sync Arbitrum or Ethereum; `harness/send.js` sends from a
+test EOA; `crates/rg-poi/examples/submit_poi.rs` proves and submits POI for a sent
+transaction. `HANDOFF.md` has the commands and where the POI artifacts come from.
+
 ## Rust to TS check
 
 Rust-made ciphertexts and signatures, with randoms the engine never saw, decrypted and
@@ -152,6 +158,6 @@ MIT. `crates/rg-primitives/src/poseidon.rs` is a port of codex-storage/rs-poseid
 optimized Poseidon parameters). Vectors in `crates/rg-keys/tests/engine_vectors.rs`
 and `crates/rg-notes/tests/engine_vectors.rs` are copied from the Railgun engine's
 tests (MIT). EdDSA is written from the circomlib scheme; no circomlibjs (GPL-3.0) code
-is ported. `crates/rg-prover/src/zkey.rs` and `qap.rs` are ported from ark-circom
+is ported. BLAKE-512 is written from the SHA-3 submission. `crates/rg-prover/src/zkey.rs` and `qap.rs` are ported from ark-circom
 0.5.0 (MIT OR Apache-2.0, Copyright (c) 2021 Georgios Konstantopoulos); the witness
 calculator follows circom_runtime's calling convention and copies no code from it.

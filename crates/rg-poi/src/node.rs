@@ -8,6 +8,9 @@ use serde_json::{json, Value};
 
 use crate::ListProof;
 
+pub const AGGREGATOR: &str = "https://ppoi.fdi.network";
+/// `POI_REQUIRED_LISTS` in shared-models.
+pub const REQUIRED_LIST: &str = "efc6ddb59c098a13fb2b618fdae94c1c3a807abc8fb1837c93620c9143ee9e88";
 const TXID_VERSION: &str = "V2_PoseidonMerkle";
 
 #[derive(Debug, thiserror::Error)]

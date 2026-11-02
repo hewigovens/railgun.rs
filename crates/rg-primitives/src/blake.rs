@@ -66,8 +66,8 @@ const STEPS: [[usize; 4]; 8] = [
 /// block that holds only padding.
 fn compress(h: &mut [u64; 8], block: &[u8], t: u128) {
     let mut m = [0u64; 16];
-    for (word, bytes) in m.iter_mut().zip(block.chunks_exact(8)) {
-        *word = u64::from_be_bytes(bytes.try_into().expect("8 bytes"));
+    for (word, bytes) in m.iter_mut().zip(block.as_chunks::<8>().0) {
+        *word = u64::from_be_bytes(*bytes);
     }
     let (t0, t1) = (t as u64, (t >> 64) as u64);
 
@@ -102,15 +102,14 @@ pub fn blake512(data: &[u8]) -> [u8; 64] {
     let mut h = IV;
     let bits = data.len() as u128 * 8;
 
-    let mut blocks = data.chunks_exact(128);
+    let (blocks, rest) = data.as_chunks::<128>();
     let mut hashed = 0u128;
-    for block in &mut blocks {
+    for block in blocks {
         hashed += 1024;
         compress(&mut h, block, hashed);
     }
 
     // Padding: 0x80, zeros, a final 1 bit, then the 128-bit big-endian length.
-    let rest = blocks.remainder();
     let end = if rest.len() < 112 { 128 } else { 256 };
     let mut pad = [0u8; 256];
     pad[..rest.len()].copy_from_slice(rest);
@@ -123,8 +122,8 @@ pub fn blake512(data: &[u8]) -> [u8; 64] {
     }
 
     let mut out = [0u8; 64];
-    for (bytes, word) in out.chunks_exact_mut(8).zip(h) {
-        bytes.copy_from_slice(&word.to_be_bytes());
+    for (bytes, word) in out.as_chunks_mut::<8>().0.iter_mut().zip(h) {
+        *bytes = word.to_be_bytes();
     }
     out
 }

@@ -1,7 +1,7 @@
-# Handoff (2026-11-01)
+# Handoff (2026-11-02)
 
-Picking this up on a local machine. Read `scope.md` for the plan and `README.md` for
-commands. This file is what the cloud session knew that those two don't say.
+Read `scope.md` for the plan and `README.md` for commands. This file is what those two
+don't say.
 
 ## Where it stands
 
@@ -14,8 +14,8 @@ commands. This file is what the cloud session knew that those two don't say.
 | M4 prove and submit one transfer | done on Arbitrum; the Anon wallet received it |
 | M5 POI | done on Arbitrum for transfers: a Rust proof reached `Valid` |
 
-Tests: `cargo test --workspace` gives 54 passed, 2 ignored (the M3 full-history test
-needs `data/`, the M4 witness and proof test needs circuit artifacts). Two of the 48
+Tests: `cargo test --workspace` gives 56 passed, 2 ignored (the M3 full-history test
+needs Sepolia `data/`, the M4 witness and proof test needs circuit artifacts). Two tests
 skip quietly without `.test-wallet/sepolia-test-mnemonic.txt`.
 
 M4 checks that pass, against engine 9.6.0 with randoms pinned:
@@ -41,9 +41,10 @@ tree 2, a real V2.1 shield included). Shield fee is 0.25%.
 Local state, all gitignored:
 
 - `.test-wallet/test-mnemonic.txt` sender wallet, `recipient-mnemonic.txt` second wallet,
-  `sepolia-eoa.key` gas account (an EOA, valid on any chain), `addresses.txt` their
+  `test-eoa.key` gas account, `addresses.txt` their
   public addresses (sender 0zk, recipient 0zk, EOA)
-- `data/arbitrum-leaves.txt`, `data/arbitrum-logs.jsonl`, `data/artifacts/{1x1,1x2,1x3}`
+- `data/arbitrum-leaves.txt`, `data/arbitrum-logs.jsonl`,
+  `data/artifacts/{1x1,1x2,1x3,poi-3x3}`
 
 To send again, with `harness` installed (`npm install --ignore-scripts`). The sender holds
 0.00025 WETH and the EOA 0.00048 ETH:
@@ -56,12 +57,13 @@ cargo run --release -p rg-wallet --example scan_file -- data/arbitrum-logs.jsonl
 cargo run --release -p rg-tx --example transfer -- arbitrum data/arbitrum-leaves.txt data/arbitrum-logs.jsonl \
   .test-wallet/test-mnemonic.txt data/artifacts $RECIPIENT $WETH <value> > .test-wallet/transfer.json
 python3 -c "import json;d=json.load(open('.test-wallet/transfer.json'));print(json.dumps({'label':'transact','to':d['to'],'value':'0','data':d['data']}))" > .test-wallet/transfer.jsonl
-node harness/send.js send $RPC .test-wallet/sepolia-eoa.key .test-wallet/transfer.jsonl
+node harness/send.js send $RPC .test-wallet/test-eoa.key .test-wallet/transfer.jsonl
 ```
 
 ethers estimates gas before sending, so a transaction the contract would reject fails
-without spending anything. Expect the recipient wallet to hold the funds as pending until
-POI (M5). The `shield` example also takes a network if a wallet-free shield is wanted.
+without spending anything. Then run `submit_poi` (below) once the squid and the aggregator
+have the transaction, or the recipient holds the funds as pending. The `shield` example
+also takes a network if a wallet-free shield is wanted.
 
 ## M5 state
 
@@ -124,8 +126,8 @@ in the lite set, so `plan_transfer` spends one note only.
 
 ## Not in git
 
-- `data/` (23 MB Sepolia logs and transact calls; refetch with Etherscan's logs API,
-  proxy `0xeCFCf3b4eC647c4Ca6D49108b311b7a7C9543fea` from block 5784866).
+- `data/`: chain data and artifacts, all refetchable with `fetch_leaves`, `fetch_logs` and
+  the artifact notes here. The M3 `sepolia-transact-calls.json` comes from Etherscan.
 - `.test-wallet/`, circuit artifacts, `target/`.
 
 ## Open items

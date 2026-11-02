@@ -2988,7 +2988,6 @@ dependencies = [
 name = "rg-poi"
 version = "0.1.0"
 dependencies = [
- "ark-bn254",
  "hex",
  "rand 0.8.8",
  "reqwest",

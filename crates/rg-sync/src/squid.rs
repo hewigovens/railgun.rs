@@ -15,7 +15,6 @@ pub struct SquidTransaction {
     pub nullifiers: Vec<[u8; 32]>,
     pub commitments: Vec<[u8; 32]>,
     pub bound_params_hash: [u8; 32],
-    pub block_number: u64,
     pub utxo_tree_in: u32,
     pub utxo_tree_out: u32,
     pub utxo_batch_start_position_out: u32,
@@ -40,7 +39,6 @@ fn transaction(v: &Value) -> Option<SquidTransaction> {
         nullifiers: words(&v["nullifiers"])?,
         commitments: words(&v["commitments"])?,
         bound_params_hash: word(&v["boundParamsHash"])?,
-        block_number: number(&v["blockNumber"])?,
         utxo_tree_in: number(&v["utxoTreeIn"])? as u32,
         utxo_tree_out: number(&v["utxoTreeOut"])? as u32,
         utxo_batch_start_position_out: number(&v["utxoBatchStartPositionOut"])? as u32,
@@ -63,7 +61,7 @@ pub fn fetch_transactions(url: &str) -> Result<Vec<SquidTransaction>, Error> {
     loop {
         let q = format!(
             "{{ transactions(orderBy: id_ASC, limit: {PAGE}, where: {{id_gt: \"{last_id}\"}}) \
-             {{ id transactionHash nullifiers commitments boundParamsHash blockNumber \
+             {{ id transactionHash nullifiers commitments boundParamsHash \
              utxoTreeIn utxoTreeOut utxoBatchStartPositionOut }} }}"
         );
         let resp = query(&http, url, q)?;

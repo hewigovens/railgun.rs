@@ -9,18 +9,18 @@ description = "Private Proof of Innocence: txid tree, blinded commitments, POI c
 [features]
 default = []
 # Blocking JSON-RPC client for the POI aggregator.
-rpc = ["dep:reqwest", "dep:serde_json"]
+rpc = ["dep:hex", "dep:reqwest", "dep:serde_json"]
 
 [dependencies]
-ark-bn254.workspace = true
-hex.workspace = true
 rg-primitives.workspace = true
 rg-tree.workspace = true
 thiserror.workspace = true
+hex = { workspace = true, optional = true }
 reqwest = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 
 [dev-dependencies]
+hex.workspace = true
 rand.workspace = true
 rg-keys.workspace = true
 rg-notes.workspace = true

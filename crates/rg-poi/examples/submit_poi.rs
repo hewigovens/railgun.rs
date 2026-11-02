@@ -7,7 +7,7 @@
 
 use rand::rngs::OsRng;
 use rg_keys::WalletKeys;
-use rg_poi::node::{blinded_hex, Node};
+use rg_poi::node::{blinded_hex, Node, AGGREGATOR, REQUIRED_LIST as LIST};
 use rg_poi::{
     blinded_commitment, global_tree_position, railgun_txid, txid_leaf, OutputNote, ProofInputs,
     SpentNote, TxidTrees,
@@ -18,15 +18,8 @@ use rg_sync::{Network, RawLog, SyncState};
 use rg_wallet::Scanner;
 use serde_json::json;
 
-const NODE: &str = "https://ppoi.fdi.network";
-const LIST: &str = "efc6ddb59c098a13fb2b618fdae94c1c3a807abc8fb1837c93620c9143ee9e88";
-
 fn fr(b: &[u8]) -> Fr {
     field::from_be_bytes_mod_order(b)
-}
-
-fn dec2(a: String, b: String) -> serde_json::Value {
-    json!([a, b])
 }
 
 fn main() {
@@ -37,7 +30,7 @@ fn main() {
         .try_into()
         .unwrap();
     let submit = a.get(7).is_some_and(|s| s == "--submit");
-    let node = Node::new(NODE, network.chain_id);
+    let node = Node::new(AGGREGATOR, network.chain_id);
 
     let mut state = SyncState::new();
     state
@@ -63,7 +56,8 @@ fn main() {
     let mut trees = TxidTrees::default();
     trees.extend(&leaves).unwrap();
     let latest = trees.latest_index().unwrap();
-    let (tree, index) = ((latest / 65536) as u32, (latest % 65536) as u32);
+    let capacity = rg_tree::TREE_CAPACITY as u64;
+    let (tree, index) = ((latest / capacity) as u32, (latest % capacity) as u32);
     let root = trees.root(tree as usize).unwrap();
     println!(
         "txid tree: {} transactions, root {}",
@@ -82,17 +76,9 @@ fn main() {
         .expect("transaction not in the squid");
     let tx = &txs[position];
 
-    // Spent notes, in the transaction's nullifier order.
-    let spent: Vec<_> = tx
-        .nullifiers
-        .iter()
-        .map(|n| {
-            scan.txos
-                .iter()
-                .find(|t| &t.nullifier == n)
-                .expect("spent note not ours")
-        })
-        .collect();
+    let spent = scan
+        .txos_for_nullifiers(tx.utxo_tree_in, &tx.nullifiers)
+        .expect("spent note not ours");
     let npk = |random: &[u8; 16]| rg_notes::note::note_public_key(&keys.master_public_key, random);
     let blinded_in: Vec<Fr> = spent
         .iter()
@@ -196,15 +182,13 @@ fn main() {
     assert!(rg_prover::verify(&circuit.pk.vk, &public, &proof).unwrap());
     println!("proof verifies against the POI key");
 
+    // snarkjs's projective third coordinate is dropped, as the engine does.
     let p = rg_prover::proof_to_json(&proof);
-    let s = |v: &serde_json::Value| v.as_str().unwrap().to_string();
+    let two = |v: &serde_json::Value| json!(v.as_array().unwrap()[..2]);
     let snark_proof = json!({
-        "pi_a": dec2(s(&p["pi_a"][0]), s(&p["pi_a"][1])),
-        "pi_b": [
-            dec2(s(&p["pi_b"][0][0]), s(&p["pi_b"][0][1])),
-            dec2(s(&p["pi_b"][1][0]), s(&p["pi_b"][1][1])),
-        ],
-        "pi_c": dec2(s(&p["pi_c"][0]), s(&p["pi_c"][1])),
+        "pi_a": two(&p["pi_a"]),
+        "pi_b": two(&p["pi_b"]),
+        "pi_c": two(&p["pi_c"]),
     });
     let hex32 = |x: &Fr| hex::encode(field::to_be_bytes(x));
     let data = json!({
