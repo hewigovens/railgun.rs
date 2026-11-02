@@ -2954,6 +2954,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "rg-core"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "rand 0.8.8",
+ "rg-keys",
+ "rg-notes",
+ "rg-poi",
+ "rg-primitives",
+ "rg-prover",
+ "rg-sync",
+ "rg-tree",
+ "rg-tx",
+ "rg-wallet",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "rg-keys"
 version = "0.1.0"
 dependencies = [
@@ -2989,15 +3008,9 @@ name = "rg-poi"
 version = "0.1.0"
 dependencies = [
  "hex",
- "rand 0.8.8",
  "reqwest",
- "rg-keys",
- "rg-notes",
  "rg-primitives",
- "rg-prover",
- "rg-sync",
  "rg-tree",
- "rg-wallet",
  "serde_json",
  "thiserror",
 ]

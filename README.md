@@ -6,6 +6,8 @@ through UniFFI. See `scope.md` for the plan and milestones, and
 
 ## Status
 
+- API: `crates/rg-core` is what bindings sit on: `Client` with a file store, sync,
+  transfers and POI.
 - M0: `harness/` generates golden vectors from the TS engine
   (`@railgun-community/engine` 9.6.0) into `vectors/`.
 - M1: `crates/rg-primitives` (Poseidon 1 to 16 inputs, BabyJubJub, field helpers) and
@@ -89,7 +91,6 @@ ARTIFACTS_DIR=<artifacts> HARNESS_NODE_MODULES=/path/to/node_modules \
   node harness/m4.js vectors/m3/sepolia-head-200.jsonl <mnemonic-file> vectors/m4
 RG_ARTIFACTS_DIR=<artifacts> cargo test --release -p rg-tx -- --ignored
 cargo run --release -p rg-prover --features wasmtime,parallel --example prove_1x2 -- <artifacts>/1x2 vectors/m4/transfer.json
-cargo run --release -p rg-tx --example transfer -- <network> <seed or -> <logs.jsonl> <mnemonic-file> <artifacts> <recipient 0zk> <token> <value> [memo]
 ```
 
 `vectors/m4/transfer.json` comes from the throwaway Sepolia test wallet, so the two
@@ -109,9 +110,9 @@ Timings for one 1x2 transfer on this machine (4-core 2.1 GHz Xeon, release):
 
 ## Mainnet and POI
 
-`fetch_leaves` and `fetch_logs` sync Arbitrum or Ethereum; `harness/send.js` sends from a
-test EOA; `crates/rg-poi/examples/submit_poi.rs` proves and submits POI for a sent
-transaction. `HANDOFF.md` has the commands and where the POI artifacts come from.
+`rg_core::Client` syncs, scans, builds transfers and proves POI. Its `wallet` example is a
+command line over that, and `harness/send.js` sends from a test EOA. `HANDOFF.md` has the
+commands and where the POI artifacts come from.
 
 ## Rust to TS check
 
@@ -148,9 +149,8 @@ HARNESS_NODE_MODULES=/path/to/node_modules node harness/check-rust.js /tmp/rust-
 - `rg_prover::Circuit::prove` checks the witness length against the zkey's variable
   count; ark-circom's matrices count one witness variable too many.
 - `rg_sync` decodes V2.1 events only (all Sepolia has). On mainnets, pre-March-2023
-  leaves are seeded by hash from the squid (`fetch_leaves`, root checked against the
-  contract), so a wallet with notes before the seed cannot be scanned yet. Reorgs and
-  persistent storage are not done yet.
+  leaves are seeded by hash from the squid, with the root checked against the contract,
+  so a wallet with notes before the seed cannot be scanned yet.
 
 ## Licensing
 

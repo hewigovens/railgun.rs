@@ -1,0 +1,22 @@
+[package]
+name = "rg-core"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "The wallet API the bindings sit on: chain store, sync, transfers and POI"
+
+[dependencies]
+hex.workspace = true
+rand.workspace = true
+rg-keys.workspace = true
+rg-notes.workspace = true
+rg-poi = { workspace = true, features = ["rpc"] }
+rg-primitives.workspace = true
+rg-prover = { workspace = true, features = ["wasmi"] }
+rg-sync = { workspace = true, features = ["rpc"] }
+rg-tree.workspace = true
+rg-tx.workspace = true
+rg-wallet.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true

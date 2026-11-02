@@ -9,6 +9,8 @@ pub struct Network {
     pub wrapped_token: &'static str,
     /// Indexer with every leaf, legacy ones included.
     pub squid: Option<&'static str>,
+    /// Blocks refetched on every sync, in case they were reorged.
+    pub reorg_window: u64,
 }
 
 impl Network {
@@ -19,6 +21,7 @@ impl Network {
         deployment_block: 5_784_866,
         wrapped_token: "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14",
         squid: None,
+        reorg_window: 64,
     };
     pub const ETHEREUM: Network = Network {
         name: "ethereum",
@@ -27,6 +30,7 @@ impl Network {
         deployment_block: 14_737_691,
         wrapped_token: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
         squid: Some("https://rail-squid.squids.live/squid-railgun-ethereum-v2/graphql"),
+        reorg_window: 64,
     };
     pub const ARBITRUM: Network = Network {
         name: "arbitrum",
@@ -35,6 +39,7 @@ impl Network {
         deployment_block: 56_109_834,
         wrapped_token: "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
         squid: Some("https://rail-squid.squids.live/squid-railgun-arbitrum-v2/graphql"),
+        reorg_window: 2_400,
     };
 
     pub fn by_name(name: &str) -> Option<Network> {

@@ -1,8 +1,8 @@
 # Architecture
 
 A Rust core for a private Railgun wallet, written to replace the TS SDK on mobile through
-UniFFI. The crates are libraries; today the full flows live in `examples/`, and there is
-no storage or FFI layer yet (see "Open items" in `HANDOFF.md`).
+UniFFI. `rg-core` is the API those bindings will sit on; the FFI layer itself is not
+written yet (see "Open items" in `HANDOFF.md`).
 
 ## Crates
 
@@ -37,17 +37,23 @@ flowchart BT
     tx --> primitives
     poi --> tree
     poi --> primitives
+    core["rg-core<br/>Client: store, sync, scan,<br/>transfers, POI"]
+    core --> tx
+    core --> poi
+    core --> wallet
+    core --> sync
+    core --> prover
 ```
 
-`rg-poi` stays independent of the wallet and prover: it builds circuit inputs, and its
-example joins it to `rg-wallet` and `rg-prover`. `rg-prover` knows nothing about Railgun
+`rg-poi` stays independent of the wallet and prover: it builds circuit inputs, and `rg-core`
+joins them. `rg-prover` knows nothing about Railgun
 and takes named signals, which is why both the transfer and POI circuits run on it.
 
 ## External systems
 
 ```mermaid
 flowchart LR
-    core["Rust core"]
+    core["rg-core"]
     rpc["EVM RPC<br/>logs, rootHistory"]
     squid["Railgun squid<br/>leaf hashes, transactions"]
     proxy["Railgun proxy contract<br/>verifies Groth16, keeps roots"]
@@ -72,10 +78,10 @@ wallet sends it.
 ```mermaid
 flowchart TD
     A{"Chain has legacy events?"}
-    A -->|"yes: Arbitrum, Ethereum"| B["fetch_leaves: leaf hashes from the squid"]
+    A -->|"yes: Arbitrum, Ethereum"| B["First sync: leaf hashes from the squid"]
     B --> C["Rebuild trees, check the root against rootHistory"]
-    C --> D["fetch_logs from the block after the last leaf"]
-    A -->|"no: Sepolia"| E["fetch_logs from deployment"]
+    C --> D["Logs from the block after the last leaf"]
+    A -->|"no: Sepolia"| E["Logs from deployment"]
     D --> F["SyncState: trees, nullifiers, root history"]
     E --> F
     F --> G["Scanner: trial-decrypt each note"]
@@ -85,7 +91,9 @@ flowchart TD
     J --> K["Spent if its nullifier was published"]
 ```
 
-Seeded leaves are hashes only, so a wallet's notes must all come after the seed. A nullifier
+`Client::sync` refetches a reorg window each time. `FileStore` keeps the seed, logs and a
+cursor, and `Client::open` replays them. Seeded leaves are hashes only, so a wallet's notes
+must all come after the seed. A nullifier
 hashes only the leaf position, so lookups are always scoped to a tree.
 
 ## A private transfer

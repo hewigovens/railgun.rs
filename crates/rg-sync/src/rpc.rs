@@ -39,6 +39,19 @@ impl RpcClient {
             .ok_or_else(|| Error::Rpc("missing result".into()))
     }
 
+    /// Runs a call against the node, as the sender would. A transaction the
+    /// contract would reject comes back as an error, at no cost.
+    pub fn estimate_gas(&self, from: &str, to: &str, data: &str) -> Result<u64, Error> {
+        let v = self.call(
+            "eth_estimateGas",
+            json!([{"from": from, "to": to, "data": data}]),
+        )?;
+        let s = v
+            .as_str()
+            .ok_or_else(|| Error::Rpc("bad gas estimate".into()))?;
+        u64::from_str_radix(s.trim_start_matches("0x"), 16).map_err(|e| Error::Rpc(e.to_string()))
+    }
+
     pub fn block_number(&self) -> Result<u64, Error> {
         let v = self.call("eth_blockNumber", json!([]))?;
         let s = v

@@ -15,7 +15,7 @@ don't say.
 | M4 prove and submit one transfer | done on Arbitrum; the Anon wallet received it |
 | M5 POI | done on Arbitrum for transfers: a Rust proof reached `Valid`, Anon shows the funds spendable |
 
-Tests: `cargo test --workspace` gives 56 passed, 2 ignored (the M3 full-history test
+Tests: `cargo test --workspace` gives 59 passed, 2 ignored (the M3 full-history test
 needs Sepolia `data/`, the M4 witness and proof test needs circuit artifacts). Two tests
 skip quietly without `.test-wallet/sepolia-test-mnemonic.txt`.
 
@@ -24,7 +24,7 @@ M4 checks that pass, against engine 9.6.0 with randoms pinned:
 - Rust witness (wasmi and wasmtime) equals snarkjs's
 - arkworks proof accepted by snarkjs and by the Sepolia contract's 1x2 key
 - recipient decrypts the Rust-built note; change comes back to the sender
-- `crates/rg-tx/examples/transfer.rs` runs the whole path in Rust
+- `rg_core::Client::build_transfer` runs the whole path in Rust
 
 First real transfer: Arbitrum tx
 `0xb4988c76c999a60d702bff903a5f9934504eed945eb34a47466c9426f89f7db2`, block 520397232,
@@ -32,56 +32,59 @@ First real transfer: Arbitrum tx
 
 ## Mainnet sync and sending
 
-Mainnets have legacy events `rg_sync` does not decode, so `fetch_leaves` seeds the tree
-with hashes from Railgun's squid and checks the root against the contract; logs take over
-from the block it prints. A wallet's notes must all come after that block, which holds
-for the fresh wallets here. Checked: the lite 1x1, 1x2 and 1x3 keys equal Arbitrum's
-on-chain keys, and seed plus live logs reproduced `merkleRoot()` exactly (1,946 leaves in
-tree 2, a real V2.1 shield included). Shield fee is 0.25%.
+`rg_core::Client` is the API; `crates/rg-core/examples/wallet.rs` is a thin command line
+over it. First sync on a mainnet seeds leaf hashes from the squid, because `rg_sync` does
+not decode legacy events, and checks the root against the contract. A wallet's notes must
+all come after that seed, which holds for the fresh wallets here. Checked: the lite 1x1,
+1x2 and 1x3 keys equal Arbitrum's on-chain keys, and synced leaves match
+`nextLeafIndex`. Shield fee is 0.25%.
 
 Local state, all gitignored:
 
 - `.test-wallet/test-mnemonic.txt` sender wallet, `recipient-mnemonic.txt` second wallet,
-  `test-eoa.key` gas account, `addresses.txt` their
-  public addresses (sender 0zk, recipient 0zk, EOA)
-- `data/arbitrum-leaves.txt`, `data/arbitrum-logs.jsonl`,
-  `data/artifacts/{1x1,1x2,1x3,poi-3x3}`
+  `test-eoa.key` gas account, `addresses.txt` their public addresses (sender 0zk,
+  recipient 0zk, EOA)
+- `data/chain/arbitrum/`, `data/artifacts/{1x1,1x2,1x3,poi-3x3}`
 
-To send again, with `harness` installed (`npm install --ignore-scripts`). The sender holds
-0.00025 WETH and the EOA 0.00048 ETH:
+Sender holds 0.00015 WETH, the EOA about 0.00046 ETH. With `harness` installed
+(`npm install --ignore-scripts`) and `$RECIPIENT` a 0zk address:
 
 ```
-RPC=https://arb1.arbitrum.io/rpc
-WETH=0x82aF49447D8a07e3bd95BD0d56f35241523fBab1
-cargo run --release -p rg-sync --features rpc --example fetch_logs -- arbitrum $RPC data/arbitrum-logs.jsonl
-cargo run --release -p rg-wallet --example scan_file -- data/arbitrum-logs.jsonl .test-wallet/test-mnemonic.txt 0 data/arbitrum-leaves.txt
-cargo run --release -p rg-tx --example transfer -- arbitrum data/arbitrum-leaves.txt data/arbitrum-logs.jsonl \
-  .test-wallet/test-mnemonic.txt data/artifacts $RECIPIENT $WETH <value> > .test-wallet/transfer.json
-python3 -c "import json;d=json.load(open('.test-wallet/transfer.json'));print(json.dumps({'label':'transact','to':d['to'],'value':'0','data':d['data']}))" > .test-wallet/transfer.jsonl
-node harness/send.js send $RPC .test-wallet/test-eoa.key .test-wallet/transfer.jsonl
+W="cargo run --release -p rg-core --example wallet -- arbitrum https://arb1.arbitrum.io/rpc data/chain .test-wallet/test-mnemonic.txt"
+WETH=0x82aF49447D8a07e3bd95BD0d56f35241523fbab1
+$W sync
+$W balance
+$W transfer data/artifacts $RECIPIENT $WETH <value> > .test-wallet/transfer.jsonl
+$W estimate <eoa> .test-wallet/transfer.jsonl
+node harness/send.js send https://arb1.arbitrum.io/rpc .test-wallet/test-eoa.key .test-wallet/transfer.jsonl
+$W sync
+$W poi data/artifacts/poi-3x3 <tx hash> --submit
 ```
 
-ethers estimates gas before sending, so a transaction the contract would reject fails
-without spending anything. Then run `submit_poi` (below) once the squid and the aggregator
-have the transaction, or the recipient holds the funds as pending. The `shield` example
-also takes a network if a wallet-free shield is wanted.
+`poi` needs the squid and aggregator to have the transaction, usually under a minute. Do
+not leave a wallet holding these keys open in Railway, or it submits POI first.
 
-## M5 state
+## Store
 
-`crates/rg-poi` and its `submit_poi` example. Arbitrum tx
-`0x32383758ec908c66fea5299ef0456d97147117f8f1f507d3783026212adc1cb8` got both outputs to
-`Valid` from a Rust proof with `--submit`, within a minute, with Railway closed.
+`rg_core::FileStore` keeps inputs (seed, logs, a cursor) and replays them on open: about
+two seconds for Arbitrum's 133k leaves on an M-series Mac. Nothing derived is stored, so a
+real database can wait until this is too slow on a phone. Each sync refetches the
+network's `reorg_window` of blocks, 64 or 2,400 on Arbitrum, which also clears anything a
+crash left past the cursor.
 
-POI artifacts: the engine's lite `poi/` folder and the IPFS root in engine 9.6.0 and wallet
-10.9.0 (`QmZrP9zaZw2L...`) are stale, and the live aggregator answers `Invalid proof` to
-proofs made with them. Railway's wallet 11.2.0 uses
+## POI artifacts
+
+The engine's lite `poi/` folder and the IPFS root in engine 9.6.0 and wallet 10.9.0
+(`QmZrP9zaZw2L...`) are stale, and the live aggregator answers `Invalid proof` to proofs
+made with them. Railway's wallet 11.2.0 uses
 `QmZ2MyM6TKxffkv6stuo2hFwmUfs3q4xgMYN164Sje8new`, with `circuits/03x03/{vkey.json,zkey.br}`
 and `prover/snarkjs/03x03.wasm.br` on `https://ipfs-lb.com/ipfs/`. Decompress into
 `data/artifacts/poi-3x3/{circuit.wasm,circuit.zkey}`. Only the 3x3 set is fetched. Their
 wasm needs two more runtime imports, now stubbed in both backends. The harness still pins
 engine 9.6.0, so it does not match this POI key.
 
-The first transfer's POI was made by Railway, after importing the sender mnemonic.
+Tx `0x32383758ec908c66fea5299ef0456d97147117f8f1f507d3783026212adc1cb8` reached `Valid` from
+a Rust proof with Railway closed. The first transfer's POI came from Railway.
 
 ## Circuit artifacts
 
@@ -127,15 +130,15 @@ in the lite set, so `plan_transfer` spends one note only.
 
 ## Not in git
 
-- `data/`: chain data and artifacts, all refetchable with `fetch_leaves`, `fetch_logs` and
-  the artifact notes here. The M3 `sepolia-transact-calls.json` comes from Etherscan.
+- `data/`: chain data and artifacts, all refetchable with `wallet sync` and the artifact
+  notes here. A fresh seed drops notes older than it, so keep `data/chain/` for live wallets. The M3 `sepolia-transact-calls.json` comes from Etherscan.
 - `.test-wallet/`, circuit artifacts, `target/`.
 
 ## Open items
 
-- POI for shields and unshields; 13x13 for larger transactions; polling built into the flow.
+- POI for shields and unshields; 13x13 for larger transactions.
 - Several inputs (2x2 needs production artifacts from IPFS), unshield, relay adapt,
   broadcaster fees.
-- Decoding legacy (pre-V2.1) events, so older wallets can scan; reorg handling, persistent
-  storage.
+- Artifact download and hash checks.
+- Decoding legacy (pre-V2.1) events, so older wallets can scan.
 - UniFFI bindings; device timings on iPhone, Mac and Android.

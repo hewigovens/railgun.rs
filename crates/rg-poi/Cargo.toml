@@ -21,14 +21,3 @@ serde_json = { workspace = true, optional = true }
 
 [dev-dependencies]
 hex.workspace = true
-rand.workspace = true
-rg-keys.workspace = true
-rg-notes.workspace = true
-rg-prover = { workspace = true, features = ["wasmi"] }
-rg-sync = { workspace = true, features = ["rpc"] }
-rg-wallet.workspace = true
-serde_json.workspace = true
-
-[[example]]
-name = "submit_poi"
-required-features = ["rpc"]

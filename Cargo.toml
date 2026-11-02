@@ -10,6 +10,7 @@ members = [
   "crates/rg-prover",
   "crates/rg-tx",
   "crates/rg-poi",
+  "crates/rg-core",
 ]
 
 [workspace.package]
@@ -54,4 +55,6 @@ rayon = "1"
 wasmi = "2"
 wasmtime = { version = "50", default-features = false, features = ["cranelift", "runtime", "std"] }
 rg-wallet = { path = "crates/rg-wallet" }
+rg-poi = { path = "crates/rg-poi" }
+rg-tx = { path = "crates/rg-tx" }
 rg-prover = { path = "crates/rg-prover", default-features = false }
