@@ -16,7 +16,7 @@ don't say.
 | M5 POI | done on Arbitrum: a Rust proof reached `Valid`, Anon shows the funds spendable |
 | Unshield, several inputs | done on Arbitrum, each with POI `Valid` |
 
-Tests: `cargo test --workspace` gives 65 passed, 2 ignored (the M3 full-history test
+Tests: `cargo test --workspace` gives 68 passed, 2 ignored (the M3 full-history test
 needs Sepolia `data/`, the M4 witness and proof test needs circuit artifacts). Two tests
 skip quietly without `.test-wallet/sepolia-test-mnemonic.txt`.
 
@@ -50,7 +50,8 @@ Local state, all gitignored:
 - `.test-wallet/test-mnemonic.txt` sender wallet, `recipient-mnemonic.txt` second wallet,
   `test-eoa.key` gas account, `addresses.txt` their public addresses (sender 0zk,
   recipient 0zk, EOA)
-- `data/chain/arbitrum/`, `data/artifacts/{1x1,1x2,1x3,poi-3x3}`
+- `data/chain/arbitrum/`, `data/chain/artifacts/` (downloaded on demand), `data/artifacts/1x2`
+  (lite, for the ignored M4 test)
 
 Sender holds 0.00001 WETH. The EOA has about 0.00042 ETH and 0.000029925 WETH. With `harness` installed
 (`npm install --ignore-scripts`) and `$RECIPIENT` a 0zk address:
@@ -60,12 +61,12 @@ W="cargo run --release -p rg-core --example wallet -- arbitrum https://arb1.arbi
 WETH=0x82aF49447D8a07e3bd95BD0d56f35241523fBab1
 $W sync
 $W balance
-$W transfer data/artifacts $RECIPIENT $WETH <value> > .test-wallet/transfer.jsonl
-$W unshield data/artifacts <to> $WETH <value> > .test-wallet/transfer.jsonl   # instead of transfer
+$W transfer $RECIPIENT $WETH <value> > .test-wallet/transfer.jsonl
+$W unshield <to> $WETH <value> > .test-wallet/transfer.jsonl   # instead of transfer
 $W estimate <eoa> .test-wallet/transfer.jsonl
 node harness/send.js send https://arb1.arbitrum.io/rpc .test-wallet/test-eoa.key .test-wallet/transfer.jsonl
 $W sync
-$W poi data/artifacts/poi-3x3 <tx hash> --submit
+$W poi <tx hash> --submit
 ```
 
 `poi` needs the squid and aggregator to have the transaction, usually under a minute. Do
@@ -79,37 +80,31 @@ real database can wait until this is too slow on a phone. Each sync refetches th
 network's `reorg_window` of blocks, 64 or 2,400 on Arbitrum, which also clears anything a
 crash left past the cursor.
 
-## POI artifacts
+## Artifacts
 
-The engine's lite `poi/` folder and the IPFS root in engine 9.6.0 and wallet 10.9.0
+`rg_core::Artifacts` downloads a circuit the first time it is needed, checks it against
+`crates/rg-core/src/artifact-v2-hashes.json` (from wallet 11.2.0) and rechecks the hash on
+every load, so a damaged file is fetched again. Transact circuits come from
+`QmUsmnK4PFc7zDp2cmC4wBZxYLjNyRgWfs5GNcJJ2uLcpU`, POI circuits from
+`QmZ2MyM6TKxffkv6stuo2hFwmUfs3q4xgMYN164Sje8new`, both through `https://ipfs-lb.com/ipfs/`.
+
+The engine's lite `poi/` folder and the POI root in engine 9.6.0 and wallet 10.9.0
 (`QmZrP9zaZw2L...`) are stale, and the live aggregator answers `Invalid proof` to proofs
-made with them. Railway's wallet 11.2.0 uses
-`QmZ2MyM6TKxffkv6stuo2hFwmUfs3q4xgMYN164Sje8new`, with `circuits/03x03/{vkey.json,zkey.br}`
-and `prover/snarkjs/03x03.wasm.br` on `https://ipfs-lb.com/ipfs/`. Decompress into
-`data/artifacts/poi-3x3/{circuit.wasm,circuit.zkey}`. Only the 3x3 set is fetched. Their
-wasm needs two more runtime imports, now stubbed in both backends. The harness still pins
-engine 9.6.0, so it does not match this POI key.
+made with them. The current wasm needs two more runtime imports, stubbed in both witness
+backends. The harness still pins engine 9.6.0, so it does not match this POI key.
+
+`prove_poi` takes the 3x3 circuit for up to three inputs and outputs and 13x13 above that.
+A 13x13 proof of a two-note transfer verifies against the published key, but no real
+4+ input transaction has gone through it yet.
 
 Tx `0x32383758ec908c66fea5299ef0456d97147117f8f1f507d3783026212adc1cb8` reached `Valid` from
 a Rust proof with Railway closed. The first transfer's POI came from Railway.
 
-## Circuit artifacts
+## Lite artifacts
 
-Not in git (unlicensed). The engine repo's `src/test/test-artifacts-lite/<shape>/` has
-brotli files `wasm.br`, `zkey.br`, `vkey.json`. Decompress into
-`<artifacts>/<shape>/circuit.wasm`, `circuit.zkey`, `vkey.json`:
-
-```
-node -e "const z=require('zlib'),f=require('fs');for(const[a,b]of[['wasm.br','circuit.wasm'],['zkey.br','circuit.zkey']])f.writeFileSync(process.argv[2]+'/'+b,z.brotliDecompressSync(f.readFileSync(process.argv[1]+'/'+a)))" <engine>/src/test/test-artifacts-lite/1x2 <artifacts>/1x2
-cp <engine>/src/test/test-artifacts-lite/1x2/vkey.json <artifacts>/1x2/
-```
-
-The lite 1x1, 1x2, 2x1 and 1x3 keys equal Sepolia's on-chain keys (set at block
-10028485, IPFS hash QmWFEVTTH3kdFxA8GLUKnCNZe5JwTVy7nJi2HgnzbVBLF4). Other shapes are not
-in the lite set. Fetch them from `https://ipfs-lb.com/ipfs/QmUsmnK4PFc7zDp2cmC4wBZxYLjNyRgWfs5GNcJJ2uLcpU/`:
-`circuits/02x02/{vkey.json,zkey.br}` and `prover/snarkjs/02x02.wasm.br`, decompressed the
-same way into `<artifacts>/2x2/`. The 2x2 key equals Arbitrum's. A missing shape fails
-as a file error when proving.
+The ignored M4 test reads `<artifacts>/1x2/{circuit.wasm,circuit.zkey,vkey.json}`. The
+engine repo's `src/test/test-artifacts-lite/1x2/` has them as brotli `wasm.br` and `zkey.br`.
+The 1x2 zkey has the same hash as the production one.
 
 ## Things learned the hard way
 
@@ -140,15 +135,13 @@ as a file error when proving.
 
 ## Not in git
 
-- `data/`: chain data and artifacts, all refetchable with `wallet sync` and the artifact
-  notes here. A fresh seed drops notes older than it, so keep `data/chain/` for live wallets. The M3 `sepolia-transact-calls.json` comes from Etherscan.
+- `data/`: chain data and artifacts, all refetchable with `wallet sync`. A fresh seed drops notes older than it, so keep `data/chain/` for live wallets. The M3 `sepolia-transact-calls.json` comes from Etherscan.
 - `.test-wallet/`, circuit artifacts, `target/`.
 
 ## Open items
 
-- 13x13 POI, for transactions over three inputs or outputs.
 - Spending across trees, which needs one transaction per tree.
 - Unshield to native ETH (relay adapt), broadcaster fees, NFTs.
-- Artifact download and hash checks.
+- `prove_poi` rebuilds the whole txid tree each time, about 30 s on Arbitrum.
 - Decoding legacy (pre-V2.1) events, so older wallets can scan.
 - UniFFI bindings; device timings on iPhone, Mac and Android.

@@ -1,19 +1,18 @@
 use std::collections::BTreeMap;
-use std::path::Path;
 
 use rg_keys::WalletKeys;
 use rg_notes::note::note_public_key;
 use rg_poi::node::{blinded_hex, Node, AGGREGATOR, REQUIRED_LIST};
 use rg_poi::{
     blinded_commitment, global_tree_position, railgun_txid, txid_leaf, OutputNote, ProofInputs,
-    SpentNote, TxidTrees, MINI_CIRCUIT,
+    SpentNote, TxidTrees, FULL_CIRCUIT, MINI_CIRCUIT,
 };
 use rg_primitives::{field, Fr};
 use rg_sync::squid::{fetch_transactions, SquidTransaction};
 use serde_json::{json, Value};
 
 use crate::transfer::prove;
-use crate::{ChainStore, Client, Error};
+use crate::{Artifacts, ChainStore, Circuit, Client, Error};
 
 /// Blinded commitment to the aggregator's word for it.
 pub type PoiStatus = BTreeMap<String, String>;
@@ -61,14 +60,27 @@ impl<S: ChainStore> Client<S> {
         Node::new(AGGREGATOR, self.network.chain_id)
     }
 
-    /// Proves POI for a transaction this wallet sent. `dir` holds the POI
-    /// 3x3 `circuit.wasm` and `circuit.zkey`. The wallet must be synced past the
-    /// transaction, and every note it spent must already be in the list.
+    /// Proves POI for a transaction this wallet sent, on the smallest circuit
+    /// that fits. The wallet must be synced past the transaction, and every
+    /// note it spent must already be in the list.
     pub fn prove_poi(
         &self,
         keys: &WalletKeys,
         tx_hash: &[u8; 32],
-        dir: &Path,
+        artifacts: &Artifacts,
+    ) -> Result<PoiProof, Error> {
+        self.prove_poi_on(keys, tx_hash, artifacts, None)
+    }
+
+    /// `prove_poi` with the circuit size forced, as the engine's
+    /// `provePOIForInputsOutputs` allows. Both sizes are valid for a small
+    /// transaction.
+    pub fn prove_poi_on(
+        &self,
+        keys: &WalletKeys,
+        tx_hash: &[u8; 32],
+        artifacts: &Artifacts,
+        size: Option<usize>,
     ) -> Result<PoiProof, Error> {
         let unprovable = |why| Error::NotProvable(hex::encode(tx_hash), why);
         let url = self
@@ -155,8 +167,10 @@ impl<S: ChainStore> Client<S> {
             list_proofs: self.node().merkle_proofs(REQUIRED_LIST, &blinded_in)?,
         };
 
-        let (proof, public) = prove(dir, &inputs.circuit_inputs(MINI_CIRCUIT)?)?;
-        if public != inputs.public_inputs(MINI_CIRCUIT, &blinded_out) {
+        let fits = tx.nullifiers.len().max(tx.commitments.len()) <= MINI_CIRCUIT;
+        let n = size.unwrap_or(if fits { MINI_CIRCUIT } else { FULL_CIRCUIT });
+        let (proof, public) = prove(artifacts, Circuit::Poi(n), &inputs.circuit_inputs(n)?)?;
+        if public != inputs.public_inputs(n, &blinded_out) {
             return Err(Error::BadProof);
         }
 

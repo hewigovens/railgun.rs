@@ -82,9 +82,10 @@ the default test run checks.
 
 ## Proving check (M4)
 
-The circuit artifacts are not committed (no licence on them). The engine repository's
-`src/test/test-artifacts-lite` has brotli-compressed 1x2 artifacts whose key equals the
-one the Sepolia contract set at block 10028485; decompress them into
+The circuit artifacts are not committed (no licence on them). `rg_core::Artifacts`
+downloads them at run time and checks their hashes. These checks read a local copy: the
+engine repository's `src/test/test-artifacts-lite` has brotli-compressed 1x2 artifacts
+whose key equals the one the Sepolia contract set at block 10028485; decompress them into
 `<artifacts>/1x2/{circuit.wasm,circuit.zkey,vkey.json}`.
 
 ```
@@ -159,7 +160,8 @@ MIT. `crates/rg-primitives/src/poseidon.rs` is a port of codex-storage/rs-poseid
 (MIT OR Apache-2.0), and `poseidon_constants_opt.json` is vendored from it (circomlib's
 optimized Poseidon parameters). Vectors in `crates/rg-keys/tests/engine_vectors.rs`
 and `crates/rg-notes/tests/engine_vectors.rs` are copied from the Railgun engine's
-tests (MIT). EdDSA is written from the circomlib scheme; no circomlibjs (GPL-3.0) code
+tests (MIT), and `crates/rg-core/src/artifact-v2-hashes.json` from the wallet SDK (MIT).
+EdDSA is written from the circomlib scheme; no circomlibjs (GPL-3.0) code
 is ported. BLAKE-512 is written from the SHA-3 submission. `crates/rg-prover/src/zkey.rs` and `qap.rs` are ported from ark-circom
 0.5.0 (MIT OR Apache-2.0, Copyright (c) 2021 Georgios Konstantopoulos); the witness
 calculator follows circom_runtime's calling convention and copies no code from it.

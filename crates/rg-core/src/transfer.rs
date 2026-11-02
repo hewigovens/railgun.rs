@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use rand::RngCore;
 use rg_keys::{decode_address, WalletKeys};
 use rg_primitives::Fr;
@@ -10,7 +8,7 @@ use rg_tx::{
     TransferParams, TransferRequest, UnshieldRequest,
 };
 
-use crate::{ChainStore, Client, Error};
+use crate::{Artifacts, ChainStore, Client, Error};
 
 const WALLET_SOURCE: &str = "rgrustcore";
 
@@ -44,15 +42,15 @@ impl UnsignedTx {
     }
 }
 
-/// Runs a circuit's witness wasm and proves. `dir` holds `circuit.wasm` and
-/// `circuit.zkey`.
+/// Runs a circuit's witness wasm and proves.
 pub(crate) fn prove(
-    dir: &Path,
+    artifacts: &Artifacts,
+    which: crate::Circuit,
     inputs: &[(String, Vec<Fr>)],
 ) -> Result<(Proof<Bn254>, Vec<Fr>), Error> {
-    let wasm = std::fs::read(dir.join("circuit.wasm"))?;
-    let circuit = Circuit::from_zkey(&std::fs::read(dir.join("circuit.zkey"))?)?;
-    let witness = rg_prover::WasmiCircuit::new(&wasm)?
+    let loaded = artifacts.load(which)?;
+    let circuit = Circuit::from_zkey(&loaded.zkey)?;
+    let witness = rg_prover::WasmiCircuit::new(&loaded.wasm)?
         .calculator()?
         .calculate(inputs)?;
     let (proof, public) = circuit.prove(&witness, &mut rand::rngs::OsRng)?;
@@ -63,13 +61,12 @@ pub(crate) fn prove(
 }
 
 impl<S: ChainStore> Client<S> {
-    /// Plans and proves a private transfer. `artifacts` holds one `<n>x<m>`
-    /// directory per circuit.
+    /// Plans and proves a private transfer.
     pub fn build_transfer(
         &self,
         keys: &WalletKeys,
         transfer: &Transfer,
-        artifacts: &Path,
+        artifacts: &Artifacts,
     ) -> Result<UnsignedTx, Error> {
         let recipient = decode_address(transfer.recipient)?;
         let request = TransferRequest {
@@ -89,12 +86,12 @@ impl<S: ChainStore> Client<S> {
         self.prove_transaction(keys, &params, artifacts)
     }
 
-    /// Plans and proves an unshield. `artifacts` is as for `build_transfer`.
+    /// Plans and proves an unshield.
     pub fn build_unshield(
         &self,
         keys: &WalletKeys,
         unshield: &Unshield,
-        artifacts: &Path,
+        artifacts: &Artifacts,
     ) -> Result<UnsignedTx, Error> {
         let request = UnshieldRequest {
             to: unshield.to,
@@ -115,15 +112,14 @@ impl<S: ChainStore> Client<S> {
         &self,
         keys: &WalletKeys,
         params: &TransferParams,
-        artifacts: &Path,
+        artifacts: &Artifacts,
     ) -> Result<UnsignedTx, Error> {
         let prepared = prepare(keys, params)?;
-        let shape = format!(
-            "{}x{}",
-            prepared.nullifiers.len(),
-            prepared.commitments.len()
-        );
-        let (proof, public) = prove(&artifacts.join(shape), &prepared.circuit_inputs)?;
+        let circuit = crate::Circuit::Transact {
+            inputs: prepared.nullifiers.len(),
+            outputs: prepared.commitments.len(),
+        };
+        let (proof, public) = prove(artifacts, circuit, &prepared.circuit_inputs)?;
         if public != prepared.public_inputs() {
             return Err(Error::BadProof);
         }

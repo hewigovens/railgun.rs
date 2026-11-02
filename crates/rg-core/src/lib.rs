@@ -2,6 +2,7 @@
 //! [`Client`] owns one network's chain data; keys are passed per call, so one
 //! client can serve several wallets.
 
+mod artifacts;
 mod poi;
 mod store;
 mod sync;
@@ -10,6 +11,7 @@ mod transfer;
 use rg_sync::rpc::RpcClient;
 use rg_sync::{Network, SyncState};
 
+pub use artifacts::{Artifacts, Circuit};
 pub use poi::{PoiProof, PoiStatus};
 pub use store::{ChainStore, FileStore};
 pub use sync::SyncReport;
@@ -19,6 +21,12 @@ pub use transfer::{Transfer, Unshield, UnsignedTx};
 pub enum Error {
     #[error("store: {0}")]
     Io(#[from] std::io::Error),
+    #[error("no artifact hashes for circuit {0}")]
+    UnknownCircuit(String),
+    #[error("downloading {0}: {1}")]
+    Download(String, String),
+    #[error("{0} does not match its published hash")]
+    ArtifactHash(String),
     #[error("stored {0} is corrupt")]
     Corrupt(&'static str),
     #[error("sync: {0}")]

@@ -70,6 +70,7 @@ flowchart LR
     proxy -->|events| rpc
 ```
 
+Artifacts are downloaded when a circuit is first needed and hash-checked on every load.
 The core never signs EVM transactions. It prints calldata, and `harness/send.js` or any
 wallet sends it.
 

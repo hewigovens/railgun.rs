@@ -4,21 +4,25 @@
 //!
 //!   sync
 //!   balance
-//!   transfer <artifacts dir> <recipient 0zk> <token> <value> [memo]   prints JSONL for harness/send.js
-//!   unshield <artifacts dir> <to> <token> <value>                     prints the same
+//!   transfer <recipient 0zk> <token> <value> [memo]   prints JSONL for harness/send.js
+//!   unshield <to> <token> <value>                     prints the same
 //!   estimate <from> <transaction jsonl>
-//!   poi <artifacts dir>/poi-3x3 <tx hash> [--submit]
+//!   poi <tx hash> [--submit | --full]
+//!
+//! Artifacts download into `<data dir>/artifacts` when first needed.
 
 use std::path::Path;
 
-use rg_core::{Client, FileStore, Transfer, Unshield, UnsignedTx};
+use rg_core::{Artifacts, Client, FileStore, Transfer, Unshield, UnsignedTx};
 use rg_keys::WalletKeys;
 use rg_sync::Network;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let a: Vec<String> = std::env::args().collect();
     let network = Network::by_name(&a[1]).ok_or("unknown network")?;
-    let store = FileStore::open(Path::new(&a[3]).join(network.name))?;
+    let data = Path::new(&a[3]);
+    let store = FileStore::open(data.join(network.name))?;
+    let artifacts = Artifacts::new(data.join("artifacts"));
     let mut client = Client::open(network, &a[2], store)?;
     let mnemonic = std::fs::read_to_string(&a[4])?;
     let keys = WalletKeys::from_mnemonic(mnemonic.trim(), "", 0)?;
@@ -51,12 +55,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let tx = client.build_transfer(
                 &keys,
                 &Transfer {
-                    recipient: &a[7],
-                    token: address(&a[8])?,
-                    value: a[9].parse()?,
-                    memo: a.get(10).map(String::as_str),
+                    recipient: &a[6],
+                    token: address(&a[7])?,
+                    value: a[8].parse()?,
+                    memo: a.get(9).map(String::as_str),
                 },
-                Path::new(&a[6]),
+                &artifacts,
             )?;
             print_tx(&tx);
         }
@@ -64,11 +68,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let tx = client.build_unshield(
                 &keys,
                 &Unshield {
-                    to: address(&a[7])?,
-                    token: address(&a[8])?,
-                    value: a[9].parse()?,
+                    to: address(&a[6])?,
+                    token: address(&a[7])?,
+                    value: a[8].parse()?,
                 },
-                Path::new(&a[6]),
+                &artifacts,
             )?;
             print_tx(&tx);
         }
@@ -88,9 +92,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("{} gas", client.estimate_gas(&a[6], &tx)?);
         }
         "poi" => {
-            let proof = client.prove_poi(&keys, &hash(&a[7])?, Path::new(&a[6]))?;
+            let flag = a.get(7).map(String::as_str);
+            let size = (flag == Some("--full")).then_some(rg_poi::FULL_CIRCUIT);
+            let proof = client.prove_poi_on(&keys, &hash(&a[6])?, &artifacts, size)?;
             println!("before: {:?}", client.poi_status(&proof)?);
-            if a.get(8).is_some_and(|s| s == "--submit") {
+            if flag == Some("--submit") {
                 client.submit_poi(&proof)?;
                 println!("after: {:?}", client.poi_status(&proof)?);
             }

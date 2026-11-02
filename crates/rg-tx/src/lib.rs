@@ -147,12 +147,11 @@ pub struct TransferParams<'a> {
     pub unshield: Option<UnshieldOutput>,
 }
 
-/// Circuits Railgun deploys (nullifiers x commitments).
+/// Circuits Railgun deploys (nullifiers x commitments): every shape of at most
+/// 14 signals. Checked against the published hashes in `rg-core`, and the
+/// Arbitrum contract has no key for 10x5.
 pub fn circuit_exists(inputs: usize, outputs: usize) -> bool {
-    matches!(
-        (inputs, outputs),
-        (1, 1..=3) | (1, 5) | (1, 10) | (1, 13) | (2..=10, 1..=5) | (11..=13, 1)
-    )
+    inputs >= 1 && outputs >= 1 && inputs + outputs <= 14
 }
 
 #[derive(Clone, Debug)]
@@ -412,7 +411,7 @@ pub struct UnshieldRequest<'a> {
     pub min_gas_price: u128,
 }
 
-/// Most inputs a transaction takes with two outputs (`circuit_exists`).
+/// Most inputs in one transaction, the engine's limit.
 pub const MAX_INPUTS: usize = 10;
 
 /// The notes to spend: the smallest single note that covers `value`, else the

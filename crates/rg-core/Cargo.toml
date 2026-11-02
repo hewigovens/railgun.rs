@@ -7,8 +7,10 @@ publish.workspace = true
 description = "The wallet API the bindings sit on: chain store, sync, transfers and POI"
 
 [dependencies]
+brotli.workspace = true
 hex.workspace = true
 rand.workspace = true
+reqwest.workspace = true
 rg-keys.workspace = true
 rg-notes.workspace = true
 rg-poi = { workspace = true, features = ["rpc"] }
@@ -19,4 +21,5 @@ rg-tree.workspace = true
 rg-tx.workspace = true
 rg-wallet.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
 thiserror.workspace = true
