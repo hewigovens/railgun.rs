@@ -7,6 +7,7 @@ A Rust core for a private Railgun wallet. `README.md` has the commands, `docs/ar
 - Investigation and code review are read-only unless fixes are requested.
 - Implementation does not authorize push. Spending real funds, or sending anything to the aggregator or another service, needs a request that covers it.
 - Keep mnemonics, keys and `.test-wallet/` contents out of source, logs, fixtures and reports.
+- Hold private keys as `PrivateKey` and borrow `WalletKeys`. Neither is `Copy` or printable, and adding either back loses that.
 - Report evidence as separate claims: build, focused tests, live integration, and measurements. Name the command behind each and list what was skipped.
 
 ## Principles
@@ -30,7 +31,7 @@ Dependency direction, never inverted: `rg-primitives` → `rg-keys`, `rg-notes`,
 
 ## UniFFI
 
-`rg-uniffi` follows JayJay's layout: `uniffi::setup_scaffolding!()` in `lib.rs`, `src/types/` for records, `#[uniffi::remote(...)]` for records owned by core crates, `#[derive(uniffi::Object)]` wrappers around `rg-core` types, and a `uniffi-bindgen.rs` binary behind the `cli` feature. It adds no logic. `u128` does not cross the boundary, so amounts are decimal strings. Calls block, so shells run them off the UI thread. Run `just test-swift` and `just test-kotlin` when the surface changes. Error fields are `reason`, since `message` collides with Kotlin's `Throwable.message`.
+`rg-uniffi` follows JayJay's layout: `uniffi::setup_scaffolding!()` in `lib.rs`, `src/types/` for records, `#[uniffi::remote(...)]` for records owned by core crates, `#[derive(uniffi::Object)]` wrappers around `rg-core` types, and a `uniffi-bindgen.rs` binary behind the `cli` feature. It adds no logic. `u128` does not cross the boundary, so amounts are decimal strings. Calls block, so shells run them off the UI thread. Run `just test-swift` and `just test-kotlin` when the surface changes. Error fields are `reason`, since `message` collides with Kotlin's `Throwable.message`. Secrets enter as `&[u8]`, which crosses by reference, never as `String`; `docs/architecture.md` lists what is wiped and what is not.
 
 ## Swift And Kotlin
 

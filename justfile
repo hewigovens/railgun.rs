@@ -14,7 +14,7 @@ test:
 
 # Needs a circuit directory: just test-proof data/artifacts
 test-proof artifacts:
-  RG_ARTIFACTS_DIR="{{artifacts}}" cargo test --release -p rg-tx -- --ignored
+  RG_ARTIFACTS_DIR="{{absolute_path(artifacts)}}" cargo test --release -p rg-tx -- --ignored
 
 format:
   cargo fmt --all

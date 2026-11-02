@@ -2,13 +2,18 @@ import Foundation
 
 struct OfflineSmoke {
     func run() throws {
-        let words = generateMnemonic()
-        Check.that(words.split(separator: " ").count == 12, "mnemonic has 12 words")
+        var words = generateMnemonic()
+        Check.that(String(bytes: words, encoding: .utf8)?.split(separator: " ").count == 12, "mnemonic has 12 words")
         let wallet = try Wallet.fromMnemonic(mnemonic: words, index: 0)
+        words.wipe()
+        Check.that(words.allSatisfy { $0 == 0 }, "buffer is wiped")
         try Check.that(wallet.address().hasPrefix("0zk"), "address is 0zk")
 
         try Check.raises(RailgunError.self, where: \.isInvalidInput, "bad mnemonic") {
-            try Wallet.fromMnemonic(mnemonic: "not a mnemonic", index: 0)
+            try Wallet.fromMnemonic(mnemonic: Data("not a mnemonic".utf8), index: 0)
+        }
+        try Check.raises(RailgunError.self, where: \.isInvalidInput, "mnemonic not UTF-8") {
+            try Wallet.fromMnemonic(mnemonic: Data([0xFF]), index: 0)
         }
 
         let dataDir = NSTemporaryDirectory() + "rg-smoke-\(UUID().uuidString)"

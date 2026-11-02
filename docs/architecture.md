@@ -158,3 +158,25 @@ are `poseidon(commitment, npk, global position)`, so the list holds no amounts o
 
 POI artifacts are versioned apart from the engine, and the live aggregator rejects proofs
 made with older keys. `HANDOFF.md` records the current IPFS root.
+
+## Key material
+
+The core never stores a key. `FileStore` holds chain data only, and a shell keeps the mnemonic in the iOS Keychain or behind the Android Keystore, device-only and unlocked-only, then builds a `Wallet` when it needs one.
+
+| Secret | Handling |
+| --- | --- |
+| Spending and viewing keys | `PrivateKey`: not `Copy`, never printed, wiped on drop. Only `expose()` reads them. |
+| `WalletKeys` | Not `Clone`, wiped on drop, and `Debug` shows only the master public key. `Wallet` drops it on Kotlin's `close()` or Swift's last release. |
+| Seed, BIP32 nodes, BIP39 entropy and words | Wiped on drop. |
+| EdDSA and Ed25519 working values, including the signing nonce | Wiped when the call returns. |
+| Mnemonic entering the core | `&[u8]` borrows the shell's own `Data` or direct `ByteBuffer`, with no UniFFI copy. The shell wipes that buffer after the call. |
+
+What this does not cover:
+
+- `generateMnemonic` returns through a UniFFI buffer that is freed without a wipe, and showing the words needs a platform string that cannot be wiped. Both happen once, at wallet creation.
+- `nullifying_key` is copied into nullifiers, circuit inputs and the circom wasm memory. It reveals which notes are spent, not how to spend them.
+- Per-note shared keys, decrypted notes and note randoms live as long as a scan result.
+- HMAC, SHA-512, PBKDF2, AES and Poseidon internals, and moves of a value on the stack, are outside what `zeroize` can reach.
+- Pages are not locked, so the OS may swap them or include them in a dump.
+
+Wiping shortens how long a secret sits in memory. It does not protect a compromised process.

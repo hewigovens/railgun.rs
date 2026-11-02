@@ -164,7 +164,7 @@ fn engine_fill(t: &Value) -> impl FnMut(&mut [u8]) {
 fn rust_prepared(t: &Value, mnemonic: &str) -> (WalletKeys, Prepared) {
     let keys = WalletKeys::from_mnemonic(mnemonic, "", 0).unwrap();
     let state = engine_state();
-    let scan = Scanner::new(keys.clone()).scan(&state);
+    let scan = Scanner::new(&keys).scan(&state);
     let recipient = decode_address(t["receiverAddress"].as_str().unwrap()).unwrap();
     let token = rg_notes::TokenData::erc20(
         hex::decode(
@@ -295,7 +295,7 @@ fn recipient_decrypts_rust_transfer() {
     }
 
     let receiver = WalletKeys::from_mnemonic(&mnemonic, "", 1).unwrap();
-    let got = Scanner::new(receiver).scan(&state);
+    let got = Scanner::new(&receiver).scan(&state);
     assert_eq!(got.txos.len(), 1);
     let note = &got.txos[0];
     assert_eq!(note.value.to_string(), t["send"]["value"].as_str().unwrap());
@@ -303,7 +303,7 @@ fn recipient_decrypts_rust_transfer() {
     assert_eq!(note.sender_master_public_key, None);
 
     let sender = WalletKeys::from_mnemonic(&mnemonic, "", 0).unwrap();
-    let mine = Scanner::new(sender).scan(&state);
+    let mine = Scanner::new(&sender).scan(&state);
     let change: Vec<_> = mine.unspent().collect();
     assert_eq!(change.len(), 1);
     assert_eq!(change[0].value, 7_000_000_000_000_000);

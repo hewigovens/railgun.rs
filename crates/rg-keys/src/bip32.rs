@@ -2,13 +2,14 @@
 
 use hmac::{Hmac, Mac};
 use sha2::Sha512;
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::Error;
 
 const CURVE_SEED: &[u8] = b"babyjubjub seed";
 const HARDENED_OFFSET: u32 = 0x8000_0000;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Zeroize, ZeroizeOnDrop)]
 pub struct KeyNode {
     pub chain_key: [u8; 32],
     pub chain_code: [u8; 32],
@@ -19,11 +20,12 @@ fn hmac_split(key: &[u8], data: &[&[u8]]) -> KeyNode {
     for part in data {
         mac.update(part);
     }
-    let i = mac.finalize().into_bytes();
+    let mut i = mac.finalize().into_bytes();
     let mut chain_key = [0u8; 32];
     let mut chain_code = [0u8; 32];
     chain_key.copy_from_slice(&i[..32]);
     chain_code.copy_from_slice(&i[32..]);
+    i.as_mut_slice().zeroize();
     KeyNode {
         chain_key,
         chain_code,

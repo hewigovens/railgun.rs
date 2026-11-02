@@ -32,7 +32,7 @@ pub struct ListProof {
 }
 
 /// `POIEngineProofInputs`.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct ProofInputs {
     pub txid_proof: MerkleProof,
     pub bound_params_hash: Fr,

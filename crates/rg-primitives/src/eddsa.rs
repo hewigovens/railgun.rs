@@ -7,6 +7,7 @@
 
 use ark_ed_on_bn254::Fr as SubgroupScalar;
 use ark_ff::{BigInteger, PrimeField};
+use zeroize::Zeroizing;
 
 use crate::babyjubjub::{BASE8, Point, prune, shr3_le};
 use crate::blake::blake512;
@@ -50,23 +51,24 @@ fn le32(x: &SubgroupScalar) -> [u8; 32] {
 }
 
 pub fn sign(private_key: &[u8; 32], message: &Fr) -> Signature {
-    let h = blake512(private_key);
-    let mut head = [0u8; 32];
+    let h = Zeroizing::new(blake512(private_key));
+    let mut head = Zeroizing::new([0u8; 32]);
     head.copy_from_slice(&h[..32]);
-    let s_bytes = prune(head);
-    let a = BASE8.mul_ct(&shr3_le(&s_bytes));
+    let s_bytes = Zeroizing::new(prune(*head));
+    let a = BASE8.mul_ct(&Zeroizing::new(shr3_le(&s_bytes)));
 
-    let mut preimage = [0u8; 64];
+    let mut preimage = Zeroizing::new([0u8; 64]);
     preimage[..32].copy_from_slice(&h[32..]);
     preimage[32..].copy_from_slice(&to_le_bytes(message));
-    let r = SubgroupScalar::from_le_bytes_mod_order(&blake512(&preimage));
-    let r8 = BASE8.mul_ct(&le32(&r));
+    let nonce = Zeroizing::new(blake512(&preimage[..]));
+    let r = Zeroizing::new(SubgroupScalar::from_le_bytes_mod_order(&nonce[..]));
+    let r8 = BASE8.mul_ct(&Zeroizing::new(le32(&r)));
 
     let hm = poseidon::hash(&[r8.x, r8.y, a.x, a.y, *message]).expect("arity 5");
-    let s = SubgroupScalar::from_le_bytes_mod_order(&s_bytes);
+    let s = Zeroizing::new(SubgroupScalar::from_le_bytes_mod_order(&s_bytes[..]));
     Signature {
         r8,
-        s: r + to_subgroup(&hm) * s,
+        s: *r + to_subgroup(&hm) * *s,
     }
 }
 

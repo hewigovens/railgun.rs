@@ -24,8 +24,8 @@ struct LiveSmoke {
     }
 
     func run() throws {
-        let mnemonic = try String(contentsOfFile: mnemonicFile, encoding: .utf8)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        var mnemonic = try Data(contentsOf: URL(fileURLWithPath: mnemonicFile))
+        defer { mnemonic.wipe() }
         let wallet = try Wallet.fromMnemonic(mnemonic: mnemonic, index: 0)
         let client = try RailgunClient.open(network: "arbitrum", rpcUrl: rpcUrl, dataDir: dataDir)
         try print("sync: \(client.sync())")

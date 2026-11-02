@@ -11,6 +11,6 @@ fn main() {
     }
     let words = generate_mnemonic();
     let keys = WalletKeys::from_mnemonic(&words, "", 0).expect("valid mnemonic");
-    std::fs::write(&path, format!("{words}\n")).expect("write mnemonic");
+    std::fs::write(&path, format!("{}\n", words.as_str())).expect("write mnemonic");
     println!("{}", keys.address().expect("encode"));
 }

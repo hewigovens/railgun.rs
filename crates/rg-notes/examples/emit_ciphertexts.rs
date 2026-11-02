@@ -36,17 +36,20 @@ const MNEMONICS: [&str; 2] = [
     "test test test test test test test test test test test junk",
 ];
 
+fn view(k: &WalletKeys) -> ViewingKeys<'_> {
+    ViewingKeys {
+        viewing_private_key: &k.viewing_private_key,
+        viewing_public_key: k.viewing_public_key,
+        master_public_key: k.master_public_key,
+    }
+}
+
 fn main() {
     let mut rng = Rng(0);
     let wallets: Vec<(&str, u32, WalletKeys)> = MNEMONICS
         .iter()
         .flat_map(|m| [0u32, 3].map(|i| (*m, i, WalletKeys::from_mnemonic(m, "", i).unwrap())))
         .collect();
-    let view = |k: &WalletKeys| ViewingKeys {
-        viewing_private_key: k.viewing_private_key,
-        viewing_public_key: k.viewing_public_key,
-        master_public_key: k.master_public_key,
-    };
     let wallet_json = |(m, i, _): &(&str, u32, WalletKeys)| json!({ "mnemonic": m, "index": i });
 
     let memos = [None, Some("hi from rust"), Some("ラーメン 🍜")];

@@ -87,6 +87,6 @@ impl<S: ChainStore> Client<S> {
     }
 
     pub fn scan(&self, keys: &WalletKeys) -> ScanResult {
-        Scanner::new(keys.clone()).scan(&self.state)
+        Scanner::new(keys).scan(&self.state)
     }
 }

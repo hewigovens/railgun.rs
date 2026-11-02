@@ -35,7 +35,7 @@ ark-relations = { version = "0.5", default-features = false }
 ark-serialize = { version = "0.5", default-features = false }
 ark-std = { version = "0.5", default-features = false }
 bech32 = "0.11"
-bip39 = { version = "2", features = ["unicode-normalization"] }
+bip39 = { version = "2", features = ["unicode-normalization", "zeroize"] }
 brotli = "8"
 ctr = "0.9"
 curve25519-dalek = "4"
@@ -63,6 +63,7 @@ tiny-keccak = { version = "2", features = ["keccak"] }
 uniffi = { version = "0.32", default-features = false }
 wasmi = "2"
 wasmtime = { version = "50", default-features = false, features = ["cranelift", "runtime", "std"] }
+zeroize = { version = "1", features = ["derive"] }
 
 [workspace.lints.clippy]
 too_many_lines = "warn"

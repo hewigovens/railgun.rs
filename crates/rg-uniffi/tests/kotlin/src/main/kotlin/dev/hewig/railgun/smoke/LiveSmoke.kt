@@ -15,7 +15,7 @@ class LiveSmoke private constructor(
     private val token = environment.getValue("RG_TOKEN")
 
     fun run() {
-        val wallet = Wallet.fromMnemonic(File(mnemonicFile).readText().trim(), 0u)
+        val wallet = File(mnemonicFile).readBytes().toSecretBuffer().useOnce { Wallet.fromMnemonic(it, 0u) }
         val client = RailgunClient.open(
             "arbitrum",
             environment.getValue("RG_RPC"),

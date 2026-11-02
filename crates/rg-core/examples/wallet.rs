@@ -14,7 +14,7 @@
 use std::path::Path;
 
 use rg_core::{Artifacts, Client, FileStore, Transfer, Unshield, UnsignedTx};
-use rg_keys::WalletKeys;
+use rg_keys::{WalletKeys, Zeroizing};
 use rg_sync::Network;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -24,7 +24,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let store = FileStore::open(data.join(network.name))?;
     let artifacts = Artifacts::new(data.join("artifacts"));
     let mut client = Client::open(network, &a[2], store)?;
-    let mnemonic = std::fs::read_to_string(&a[4])?;
+    let mnemonic = Zeroizing::new(std::fs::read_to_string(&a[4])?);
     let keys = WalletKeys::from_mnemonic(mnemonic.trim(), "", 0)?;
     let hash = |s: &str| -> Result<[u8; 32], Box<dyn std::error::Error>> {
         hex::decode(s.trim_start_matches("0x"))?

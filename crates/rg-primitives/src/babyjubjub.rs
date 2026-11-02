@@ -5,6 +5,7 @@
 use std::sync::LazyLock;
 
 use ark_ff::{Field, One, Zero};
+use zeroize::Zeroizing;
 
 use crate::blake::blake512;
 use crate::field::{from_decimal, to_le_bytes};
@@ -200,11 +201,11 @@ pub fn prune(mut buf: [u8; 32]) -> [u8; 32] {
 
 /// circomlib `eddsa.prv2pub`: `Base8 * (prune(blake512(prv)[0..32]) >> 3)`.
 pub fn private_to_public(private_key: &[u8; 32]) -> Point {
-    let h = blake512(private_key);
-    let mut s = [0u8; 32];
-    s.copy_from_slice(&h[..32]);
-    let s = shr3_le(&prune(s));
-    BASE8.mul_ct(&s)
+    let h = Zeroizing::new(blake512(private_key));
+    let mut head = Zeroizing::new([0u8; 32]);
+    head.copy_from_slice(&h[..32]);
+    let pruned = Zeroizing::new(prune(*head));
+    BASE8.mul_ct(&Zeroizing::new(shr3_le(&pruned)))
 }
 
 /// Right shift a 256-bit little-endian integer by 3 bits.

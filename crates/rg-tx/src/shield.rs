@@ -89,7 +89,11 @@ mod tests {
         let req = &call._shieldRequests[0];
         assert_eq!(req.preimage.value.to::<u128>(), 1000);
         let bundle = req.ciphertext.encryptedBundle.map(|b| b.0);
-        let key = shared_key(&keys.viewing_private_key, &req.ciphertext.shieldKey.0).unwrap();
+        let key = shared_key(
+            keys.viewing_private_key.expose(),
+            &req.ciphertext.shieldKey.0,
+        )
+        .unwrap();
         let random = decrypt_random(&bundle, &key).unwrap();
         let npk = note_public_key(&keys.master_public_key, &random);
         assert_eq!(req.preimage.npk.0, to_be_bytes(&npk));

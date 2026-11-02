@@ -136,7 +136,7 @@ fn key_derivation_vectors() {
     ];
     for (mnemonic, path, prv, ax, ay, vpub, nk) in vectors {
         let seed = mnemonic_to_seed(mnemonic, "").unwrap();
-        let node = KeyNode::master(&seed).derive_path(path).unwrap();
+        let node = KeyNode::master(&seed[..]).derive_path(path).unwrap();
         assert_eq!(node.chain_key, prv, "{path}");
         let a = private_to_public(&node.chain_key);
         assert_eq!(to_decimal(&a.x), ax);

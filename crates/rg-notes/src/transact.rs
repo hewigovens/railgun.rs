@@ -3,10 +3,10 @@
 //! Plaintext, one AES-256-GCM stream with a 16-byte IV: encodedMPK(32), tokenHash(32), random(16) || value(16, big-endian), then the memo text. The first three blocks go into `ciphertext[1..4]` with `iv || tag` in `ciphertext[0]`; the memo's ciphertext travels separately.
 
 use ark_ff::PrimeField;
-use rg_primitives::Fr;
 use rg_primitives::aes::{decrypt_gcm, encrypt_gcm};
 use rg_primitives::ed25519::{blind_keys, shared_key, unblind_key};
 use rg_primitives::field::{from_be_bytes_mod_order, to_be_bytes};
+use rg_primitives::{Fr, PrivateKey};
 
 use crate::memo::{decode_text, decrypt_annotation, encode_text, encrypt_annotation_v2};
 use crate::{AnnotationData, Error, OutputType, note};
@@ -110,8 +110,8 @@ pub struct CommitmentCiphertextV2 {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct ViewingKeys {
-    pub viewing_private_key: [u8; 32],
+pub struct ViewingKeys<'a> {
+    pub viewing_private_key: &'a PrivateKey,
     pub viewing_public_key: [u8; 32],
     pub master_public_key: Fr,
 }
@@ -156,7 +156,7 @@ pub fn create_commitment_ciphertext_v2(
     )
     .ok_or(Error::InvalidPoint)?;
     let key = shared_key(
-        &sender.viewing_private_key,
+        sender.viewing_private_key.expose(),
         &blinded.blinded_receiver_viewing_key,
     )
     .ok_or(Error::InvalidPoint)?;
@@ -176,7 +176,7 @@ pub fn create_commitment_ciphertext_v2(
         note.output_type,
         &note.sender_random,
         note.wallet_source,
-        &sender.viewing_private_key,
+        sender.viewing_private_key.expose(),
         ctr_iv,
     )?;
     Ok(CommitmentCiphertextV2 {
@@ -225,8 +225,11 @@ pub fn decrypt_as_receiver(
     wallet: &ViewingKeys,
     c: &CommitmentCiphertextV2,
 ) -> Result<DecryptedNote, Error> {
-    let key = shared_key(&wallet.viewing_private_key, &c.blinded_sender_viewing_key)
-        .ok_or(Error::InvalidPoint)?;
+    let key = shared_key(
+        wallet.viewing_private_key.expose(),
+        &c.blinded_sender_viewing_key,
+    )
+    .ok_or(Error::InvalidPoint)?;
     let p = decrypt_note_v2(&key, &note_ciphertext(c))?;
     let own = to_be_bytes(&wallet.master_public_key);
     // The engine compares integers; an encoded MPK equal to ours means the sender hid their address.
@@ -264,10 +267,13 @@ pub fn decrypt_as_sender(
     wallet: &ViewingKeys,
     c: &CommitmentCiphertextV2,
 ) -> Result<DecryptedNote, Error> {
-    let key = shared_key(&wallet.viewing_private_key, &c.blinded_receiver_viewing_key)
-        .ok_or(Error::InvalidPoint)?;
+    let key = shared_key(
+        wallet.viewing_private_key.expose(),
+        &c.blinded_receiver_viewing_key,
+    )
+    .ok_or(Error::InvalidPoint)?;
     let p = decrypt_note_v2(&key, &note_ciphertext(c))?;
-    let annotation = decrypt_annotation(&c.annotation_data, &wallet.viewing_private_key);
+    let annotation = decrypt_annotation(&c.annotation_data, wallet.viewing_private_key.expose());
     let sender_random = annotation.as_ref().map(|a| a.sender_random);
     let receiver_mpk = match sender_random {
         Some(r) if r != SENDER_RANDOM_NULL => p.encoded_master_public_key,

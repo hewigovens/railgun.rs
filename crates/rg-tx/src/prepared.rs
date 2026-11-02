@@ -16,7 +16,7 @@ use crate::{
     signature_message, snark_proof,
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Prepared {
     pub merkle_root: Fr,
     pub bound_params: abi::BoundParams,
@@ -56,7 +56,7 @@ impl TransferParams<'_> {
         commitments.extend(p.unshield.iter().map(UnshieldOutput::commitment));
 
         let sender = ViewingKeys {
-            viewing_private_key: keys.viewing_private_key,
+            viewing_private_key: &keys.viewing_private_key,
             viewing_public_key: keys.viewing_public_key,
             master_public_key: keys.master_public_key,
         };
@@ -87,7 +87,7 @@ impl TransferParams<'_> {
             &nullifiers,
             &commitments,
         )?;
-        let signature = eddsa::sign(&keys.spending_private_key, &msg);
+        let signature = eddsa::sign(keys.spending_private_key.expose(), &msg);
 
         let fr16 = |b: &[u8; 16]| from_be_bytes_mod_order(b);
         let mut path = Vec::with_capacity(ni * TREE_DEPTH);

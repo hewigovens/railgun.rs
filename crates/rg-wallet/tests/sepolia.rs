@@ -32,7 +32,7 @@ fn sync(path: &Path) -> SyncState {
 }
 
 fn scan(state: &SyncState) -> ScanResult {
-    Scanner::new(WalletKeys::from_mnemonic(MNEMONIC, "", 0).unwrap()).scan(state)
+    Scanner::new(&WalletKeys::from_mnemonic(MNEMONIC, "", 0).unwrap()).scan(state)
 }
 
 #[test]

@@ -88,7 +88,7 @@ fn wallet_keys_and_addresses_match_engine() {
 
         let k = WalletKeys::from_mnemonic(&w.mnemonic, &w.password, w.index).unwrap();
         assert_eq!(
-            hex::encode(k.spending_private_key),
+            hex::encode(k.spending_private_key.expose()),
             w.spending_private_key,
             "spend prv {ctx}"
         );
@@ -103,7 +103,7 @@ fn wallet_keys_and_addresses_match_engine() {
             "Ay {ctx}"
         );
         assert_eq!(
-            hex::encode(k.viewing_private_key),
+            hex::encode(k.viewing_private_key.expose()),
             w.viewing_private_key,
             "view prv {ctx}"
         );

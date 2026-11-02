@@ -4,21 +4,23 @@ use curve25519_dalek::constants::ED25519_BASEPOINT_TABLE;
 use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
 use curve25519_dalek::scalar::Scalar;
 use sha2::{Digest, Sha256, Sha512};
+use zeroize::{Zeroize, Zeroizing};
 
 /// `getPrivateScalarFromPrivateKey`: clamped sha512(prv)[0..32], little-endian, mod l. The engine maps 0 to l, which is the same point multiple.
-pub fn private_scalar(private_key: &[u8; 32]) -> Scalar {
-    let h = Sha512::digest(private_key);
-    let mut head = [0u8; 32];
+pub fn private_scalar(private_key: &[u8; 32]) -> Zeroizing<Scalar> {
+    let mut h = Sha512::digest(private_key);
+    let mut head = Zeroizing::new([0u8; 32]);
     head.copy_from_slice(&h[..32]);
+    h.as_mut_slice().zeroize();
     head[0] &= 0b1111_1000;
     head[31] &= 0b0111_1111;
     head[31] |= 0b0100_0000;
-    Scalar::from_bytes_mod_order(head)
+    Zeroizing::new(Scalar::from_bytes_mod_order(*head))
 }
 
 /// The Ed25519 public key of a 32-byte private key (viewing key, shield key).
 pub fn public_key(private_key: &[u8; 32]) -> [u8; 32] {
-    (ED25519_BASEPOINT_TABLE * &private_scalar(private_key))
+    (ED25519_BASEPOINT_TABLE * &*private_scalar(private_key))
         .compress()
         .to_bytes()
 }
@@ -26,7 +28,7 @@ pub fn public_key(private_key: &[u8; 32]) -> [u8; 32] {
 /// `getSharedSymmetricKey`: sha256 of the compressed point `pub * scalar(prv)`. None when `public_key` is not a curve point. Like the engine's wasm path (curve25519-dalek), a non-canonical y encoding is accepted.
 pub fn shared_key(private_key: &[u8; 32], public_key: &[u8; 32]) -> Option<[u8; 32]> {
     let point = CompressedEdwardsY(*public_key).decompress()?;
-    let shared = (point * private_scalar(private_key)).compress();
+    let shared = (point * *private_scalar(private_key)).compress();
     Some(Sha256::digest(shared.as_bytes()).into())
 }
 

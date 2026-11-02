@@ -9,6 +9,7 @@ use rg_notes::transact::{
 };
 use rg_notes::{OutputType, TokenData, TokenType, wallet_source};
 use rg_primitives::Fr;
+use rg_primitives::PrivateKey;
 use rg_primitives::ed25519::shared_key;
 use rg_primitives::field::{from_decimal, to_be_bytes, to_decimal};
 use serde::Deserialize;
@@ -329,12 +330,12 @@ fn transact_note_ciphertexts_match_engine_and_decrypt_both_ways() {
     for (i, t) in f.transact_notes.iter().enumerate() {
         let ctx = format!("note {i}");
         let sender = ViewingKeys {
-            viewing_private_key: h(&t.sender_viewing_private_key),
+            viewing_private_key: &PrivateKey::new(h(&t.sender_viewing_private_key)),
             viewing_public_key: h(&t.sender_viewing_public_key),
             master_public_key: dec(&t.sender_master_public_key),
         };
         let receiver = ViewingKeys {
-            viewing_private_key: h(&t.receiver_viewing_private_key),
+            viewing_private_key: &PrivateKey::new(h(&t.receiver_viewing_private_key)),
             viewing_public_key: h(&t.receiver_viewing_public_key),
             master_public_key: dec(&t.receiver_master_public_key),
         };
@@ -368,7 +369,11 @@ fn transact_note_ciphertexts_match_engine_and_decrypt_both_ways() {
             t.blinded_receiver_viewing_key,
             "{ctx}"
         );
-        let key = shared_key(&sender.viewing_private_key, &c.blinded_receiver_viewing_key).unwrap();
+        let key = shared_key(
+            sender.viewing_private_key.expose(),
+            &c.blinded_receiver_viewing_key,
+        )
+        .unwrap();
         assert_eq!(hex::encode(key), t.shared_key, "{ctx}");
         for (k, block) in c.ciphertext.iter().enumerate() {
             assert_eq!(hex::encode(block), t.ciphertext[k], "{ctx} block {k}");
@@ -393,7 +398,7 @@ fn transact_note_ciphertexts_match_engine_and_decrypt_both_ways() {
             .clone();
         if other != t.receiver_viewing_private_key && other != t.sender_viewing_private_key {
             let stranger = ViewingKeys {
-                viewing_private_key: h(&other),
+                viewing_private_key: &PrivateKey::new(h(&other)),
                 ..receiver
             };
             assert!(decrypt_as_receiver(&stranger, &c).is_err(), "{ctx}");

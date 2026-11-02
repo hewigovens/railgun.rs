@@ -81,6 +81,8 @@ not leave a wallet holding these keys open in Railway, or it submits POI first.
 
 Android coverage so far: the `wallet` example, built with the NDK, ran on an Android 16 arm64 emulator against live Arbitrum: sync 2.9 s, transfer with proving 2.9 s, POI 9.9 s with cached circuits and leaves. The Kotlin bindings have not run inside an Android app, so loading `librg_uniffi.so` through JNA on Android is untested. Emulator times come from this M4 Pro, not a phone.
 
+Mnemonics cross as bytes. `Wallet.fromMnemonic` takes `Data` in Swift and a direct `ByteBuffer` in Kotlin and borrows them, and `generateMnemonic` returns `Data` or `ByteArray`. The shell wipes its buffer; the smoke tests show how.
+
 ## Store
 
 `rg_core::FileStore` keeps inputs (seed, logs, a cursor) and replays them on open: about
@@ -153,3 +155,5 @@ The 1x2 zkey has the same hash as the production one.
 - Unshield to native ETH (relay adapt), broadcaster fees, NFTs.
 - Decoding legacy (pre-V2.1) events, so older wallets can scan.
 - A small Android app to load the bindings through JNA; timings on a real iPhone and Android device.
+- Signing and sending the public transaction from Rust, and shielding through `Client`. `harness/send.js` signs today, and `rg-tx` only has `shield_calldata`.
+- A view-only `Wallet`, so scanning needs no spending key and the shell can gate that key behind biometrics.

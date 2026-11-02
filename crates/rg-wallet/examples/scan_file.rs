@@ -32,7 +32,7 @@ fn main() {
 
     let keys = WalletKeys::from_mnemonic(mnemonic.trim(), "", index).unwrap();
     let t1 = std::time::Instant::now();
-    let scan = Scanner::new(keys).scan(&state);
+    let scan = Scanner::new(&keys).scan(&state);
     let scan_ms = t1.elapsed().as_millis();
 
     let out = json!({

@@ -6,23 +6,19 @@ use rg_sync::{Commitment, Leaf, SyncState};
 
 use crate::{ScanResult, SentNote, Txo, TxoSource};
 
-pub struct Scanner {
-    keys: WalletKeys,
-    viewing: ViewingKeys,
+pub struct Scanner<'a> {
+    keys: &'a WalletKeys,
+    viewing: ViewingKeys<'a>,
 }
 
-impl Scanner {
-    pub fn new(keys: WalletKeys) -> Self {
+impl<'a> Scanner<'a> {
+    pub fn new(keys: &'a WalletKeys) -> Self {
         let viewing = ViewingKeys {
-            viewing_private_key: keys.viewing_private_key,
+            viewing_private_key: &keys.viewing_private_key,
             viewing_public_key: keys.viewing_public_key,
             master_public_key: keys.master_public_key,
         };
         Scanner { keys, viewing }
-    }
-
-    pub fn keys(&self) -> &WalletKeys {
-        &self.keys
     }
 
     /// Scans every leaf of every tree.
@@ -75,9 +71,10 @@ impl Scanner {
         let leaf_hash = leaf.commitment.hash();
         match &leaf.commitment {
             Commitment::Shield(s) => {
-                let Ok(random) =
-                    shield::decrypt_as_receiver(&self.keys.viewing_private_key, &s.ciphertext)
-                else {
+                let Ok(random) = shield::decrypt_as_receiver(
+                    self.keys.viewing_private_key.expose(),
+                    &s.ciphertext,
+                ) else {
                     return;
                 };
                 // The engine trusts the GCM tag here; also require the note public key to be ours, or the note could never be spent.
