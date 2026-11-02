@@ -13,8 +13,8 @@ const SEED_BEHIND_HEAD: u64 = 1_000;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SyncReport {
     pub head: u64,
-    pub new_logs: usize,
-    pub leaves: usize,
+    pub new_logs: u64,
+    pub leaves: u64,
 }
 
 impl<S: ChainStore> Client<S> {
@@ -76,13 +76,13 @@ impl<S: ChainStore> Client<S> {
             self.store.append_logs(&logs)?;
             self.store.set_cursor(to + 1)?;
             self.state.apply_all(&logs)?;
-            new_logs += logs.len();
+            new_logs += logs.len() as u64;
             from = to + 1;
         }
         Ok(SyncReport {
             head,
             new_logs,
-            leaves: self.state.leaf_count(),
+            leaves: self.state.leaf_count() as u64,
         })
     }
 

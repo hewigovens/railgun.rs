@@ -1,8 +1,7 @@
 # Architecture
 
 A Rust core for a private Railgun wallet, written to replace the TS SDK on mobile through
-UniFFI. `rg-core` is the API those bindings will sit on; the FFI layer itself is not
-written yet (see "Open items" in `HANDOFF.md`).
+UniFFI. `rg-core` is the API, and `rg-uniffi` exposes it to Swift with no logic of its own.
 
 ## Crates
 
@@ -43,6 +42,8 @@ flowchart BT
     core --> wallet
     core --> sync
     core --> prover
+    uniffi["rg-uniffi<br/>Swift bindings"]
+    uniffi --> core
 ```
 
 `rg-poi` stays independent of the wallet and prover: it builds circuit inputs, and `rg-core`

@@ -8,7 +8,8 @@ use rg_poi::{
     global_tree_position, railgun_txid, txid_leaf,
 };
 use rg_primitives::{Fr, field};
-use rg_sync::squid::{SquidTransaction, fetch_transactions};
+use rg_sync::squid::{SquidTransaction, fetch_transaction, fetch_transactions_after};
+use rg_tree::TREE_CAPACITY;
 use serde_json::{Value, json};
 
 use crate::transfer::prove;
@@ -37,22 +38,14 @@ fn hex32(x: &Fr) -> String {
     hex::encode(field::to_be_bytes(x))
 }
 
-fn txid_trees(txs: &[SquidTransaction]) -> Result<TxidTrees, Error> {
-    let leaves: Vec<Fr> = txs
-        .iter()
-        .map(|t| {
-            let txid = railgun_txid(
-                &frs(&t.nullifiers),
-                &frs(&t.commitments),
-                &fr(&t.bound_params_hash),
-            );
-            let out = global_tree_position(t.utxo_tree_out, t.utxo_batch_start_position_out);
-            txid_leaf(&txid, t.utxo_tree_in, out)
-        })
-        .collect();
-    let mut trees = TxidTrees::default();
-    trees.extend(&leaves)?;
-    Ok(trees)
+fn leaf(t: &SquidTransaction) -> Fr {
+    let txid = railgun_txid(
+        &frs(&t.nullifiers),
+        &frs(&t.commitments),
+        &fr(&t.bound_params_hash),
+    );
+    let out = global_tree_position(t.utxo_tree_out, t.utxo_batch_start_position_out);
+    txid_leaf(&txid, t.utxo_tree_in, out)
 }
 
 impl<S: ChainStore> Client<S> {
@@ -60,9 +53,31 @@ impl<S: ChainStore> Client<S> {
         Node::new(AGGREGATOR, self.network.chain_id)
     }
 
+    /// Every txid leaf. Hashing them is the slow part of a POI proof, so leaves past the reorg window are stored and later runs fetch only what came after.
+    fn txid_leaves(&mut self, url: &str) -> Result<Vec<Fr>, Error> {
+        let (stored, last_id) = self.store.txid_leaves()?;
+        let recent = fetch_transactions_after(url, last_id.as_deref().unwrap_or(""))?;
+        let final_block = self
+            .rpc
+            .block_number()?
+            .saturating_sub(self.network.reorg_window);
+
+        let mut leaves: Vec<Fr> = stored.iter().map(|l| fr(l)).collect();
+        let mut settled = Vec::new();
+        for t in &recent {
+            let hash = leaf(t);
+            leaves.push(hash);
+            if t.block_number <= final_block {
+                settled.push((t.id.clone(), field::to_be_bytes(&hash)));
+            }
+        }
+        self.store.append_txid_leaves(&settled)?;
+        Ok(leaves)
+    }
+
     /// Proves POI for a transaction this wallet sent, on the smallest circuit that fits. The wallet must be synced past the transaction, and every note it spent must already be in the list.
     pub fn prove_poi(
-        &self,
+        &mut self,
         keys: &WalletKeys,
         tx_hash: &[u8; 32],
         artifacts: &Artifacts,
@@ -72,7 +87,7 @@ impl<S: ChainStore> Client<S> {
 
     /// `prove_poi` with the circuit size forced, as the engine's `provePOIForInputsOutputs` allows. Both sizes are valid for a small transaction.
     pub fn prove_poi_on(
-        &self,
+        &mut self,
         keys: &WalletKeys,
         tx_hash: &[u8; 32],
         artifacts: &Artifacts,
@@ -83,13 +98,28 @@ impl<S: ChainStore> Client<S> {
             .network
             .squid
             .ok_or(Error::NoSquid(self.network.name))?;
-        let txs = fetch_transactions(url)?;
-        let index = txs
+        let tx = fetch_transaction(url, tx_hash)?.ok_or_else(|| unprovable("not indexed yet"))?;
+        let leaves = self.txid_leaves(url)?;
+        let tx_leaf = leaf(&tx);
+        let index = leaves
             .iter()
-            .position(|t| &t.transaction_hash == tx_hash)
-            .ok_or_else(|| unprovable("not indexed yet"))?;
-        let tx = &txs[index];
-        let trees = txid_trees(&txs)?;
+            .position(|l| l == &tx_leaf)
+            .ok_or_else(|| unprovable("not in the txid tree yet"))? as u64;
+        let latest = leaves.len() as u64 - 1;
+        let mut trees = TxidTrees::default();
+        trees.extend(&leaves)?;
+
+        let capacity = TREE_CAPACITY as u64;
+        let (tree, position) = ((latest / capacity) as u32, (latest % capacity) as u32);
+        let root = trees.root(tree as usize).ok_or(Error::BadProof)?;
+        if !self
+            .node()
+            .validate_txid_merkleroot(tree, position, &root)?
+        {
+            return Err(unprovable(
+                "the aggregator has not validated this txid root yet",
+            ));
+        }
 
         let scan = self.scan(keys);
         let spent = scan
@@ -141,7 +171,7 @@ impl<S: ChainStore> Client<S> {
             )
         });
         let inputs = ProofInputs {
-            txid_proof: trees.proof(index as u64)?,
+            txid_proof: trees.proof(index)?,
             bound_params_hash: fr(&tx.bound_params_hash),
             nullifiers: frs(&tx.nullifiers),
             commitments_out: frs(&tx.commitments),
@@ -180,7 +210,7 @@ impl<S: ChainStore> Client<S> {
             "snarkProof": {"pi_a": two(&p["pi_a"]), "pi_b": two(&p["pi_b"]), "pi_c": two(&p["pi_c"])},
             "poiMerkleroots": inputs.list_proofs.iter().map(|l| hex32(&l.root)).collect::<Vec<_>>(),
             "txidMerkleroot": hex32(&inputs.txid_proof.root),
-            "txidMerklerootIndex": txs.len() - 1,
+            "txidMerklerootIndex": latest,
             "blindedCommitmentsOut": blinded_out,
             "railgunTxidIfHasUnshield": unshield.as_deref().unwrap_or("0x00"),
         });

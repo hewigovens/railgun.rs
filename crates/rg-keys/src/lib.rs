@@ -7,4 +7,4 @@ pub mod keys;
 
 pub use address::{AddressData, Chain, decode_address, encode_address};
 pub use error::Error;
-pub use keys::WalletKeys;
+pub use keys::{WalletKeys, generate_mnemonic};

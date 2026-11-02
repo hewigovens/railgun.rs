@@ -12,6 +12,7 @@ pub use artifacts::{Artifacts, Circuit};
 pub use client::Client;
 pub use error::Error;
 pub use poi::{PoiProof, PoiStatus};
+pub use rg_tx::Error as TxError;
 pub use store::{ChainStore, FileStore};
 pub use sync::SyncReport;
 pub use transfer::{Transfer, Unshield, UnsignedTx};

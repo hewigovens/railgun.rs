@@ -1,10 +1,13 @@
 //! Wallet keys from a mnemonic (engine src/key-derivation/wallet-node.ts).
 
 use ed25519_dalek::SigningKey;
+use rand::RngCore;
+use rand::rngs::OsRng;
 use rg_primitives::babyjubjub::{self, Point};
 use rg_primitives::{Fr, field, poseidon};
 
 use crate::Error;
+use crate::address::{ADDRESS_VERSION, AddressData, encode_address};
 use crate::bip32::KeyNode;
 
 pub const SPENDING_PATH_PREFIX: &str = "m/44'/1984'/0'/0'/";
@@ -36,7 +39,26 @@ pub fn mnemonic_to_seed(mnemonic: &str, password: &str) -> Result<[u8; 64], Erro
     Ok(m.to_seed_normalized(password))
 }
 
+/// A fresh 12-word mnemonic from the OS random source.
+pub fn generate_mnemonic() -> String {
+    let mut entropy = [0u8; 16];
+    OsRng.fill_bytes(&mut entropy);
+    bip39::Mnemonic::from_entropy(&entropy)
+        .expect("16 bytes is a valid entropy length")
+        .to_string()
+}
+
 impl WalletKeys {
+    /// The 0zk address, valid on every chain.
+    pub fn address(&self) -> Result<String, Error> {
+        encode_address(&AddressData {
+            master_public_key: self.master_public_key,
+            viewing_public_key: self.viewing_public_key,
+            chain: None,
+            version: ADDRESS_VERSION,
+        })
+    }
+
     pub fn from_mnemonic(mnemonic: &str, password: &str, index: u32) -> Result<Self, Error> {
         Self::from_seed(&mnemonic_to_seed(mnemonic, password)?, index)
     }

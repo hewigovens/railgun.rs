@@ -26,11 +26,11 @@ A Rust core for a private Railgun wallet. `README.md` has the commands, `docs/ar
 - Use `pub(crate)` or `pub(super)`, never path-scoped `pub(in ...)`.
 - A function over 120 lines fails `clippy::too_many_lines`; split it by responsibility unless it is a vector table.
 
-Dependency direction, never inverted: `rg-primitives` → `rg-keys`, `rg-notes`, `rg-tree` → `rg-sync` → `rg-wallet` → `rg-tx` → `rg-core`. `rg-prover` knows nothing about Railgun, and `rg-poi` depends only on `rg-primitives` and `rg-tree`; `rg-core` joins them.
+Dependency direction, never inverted: `rg-primitives` → `rg-keys`, `rg-notes`, `rg-tree` → `rg-sync` → `rg-wallet` → `rg-tx` → `rg-core` → `rg-uniffi`. `rg-prover` knows nothing about Railgun, and `rg-poi` depends only on `rg-primitives` and `rg-tree`; `rg-core` joins them.
 
 ## UniFFI
 
-Bindings go in one crate, `rg-uniffi`, following JayJay's layout: `uniffi::setup_scaffolding!()` in `lib.rs`, `src/types/` for records, `#[uniffi::remote(...)]` for types owned by core crates, `#[derive(uniffi::Object)]` wrappers around `rg-core` types, and a `uniffi-bindgen.rs` binary behind a feature. Blocking network calls stay off the UI thread in the shell.
+`rg-uniffi` follows JayJay's layout: `uniffi::setup_scaffolding!()` in `lib.rs`, `src/types/` for records, `#[uniffi::remote(...)]` for records owned by core crates, `#[derive(uniffi::Object)]` wrappers around `rg-core` types, and a `uniffi-bindgen.rs` binary behind the `cli` feature. It adds no logic. `u128` does not cross the boundary, so amounts are decimal strings. Calls block, so shells run them off the UI thread. Run `just test-swift` when the surface changes.
 
 ## Version Control
 
@@ -48,6 +48,7 @@ Re-read the whole diff and run two cleanup rounds: delete what the change left d
 just test-rust <crate> [filter]
 just test
 just test-proof <artifacts>
+just test-swift
 just lint
 just format
 ```

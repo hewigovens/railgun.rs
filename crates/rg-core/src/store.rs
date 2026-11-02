@@ -19,9 +19,12 @@ pub trait ChainStore {
     fn append_logs(&mut self, logs: &[RawLog]) -> Result<(), Error>;
     /// Drops logs at or after `block`. Returns how many went.
     fn truncate_logs(&mut self, block: u64) -> Result<usize, Error>;
+    /// Txid tree leaves past the reorg window, with the squid id of the last one.
+    fn txid_leaves(&self) -> Result<(Vec<[u8; 32]>, Option<String>), Error>;
+    fn append_txid_leaves(&mut self, leaves: &[(String, [u8; 32])]) -> Result<(), Error>;
 }
 
-/// One directory per network: `leaves.txt`, `logs.jsonl`, `cursor`.
+/// One directory per network: `leaves.txt`, `logs.jsonl`, `cursor`, `txid-leaves.txt`.
 pub struct FileStore {
     dir: PathBuf,
 }
@@ -50,10 +53,19 @@ impl FileStore {
     }
 
     /// Complete lines only: a crash during an append can leave a partial one.
-    fn log_lines(&self) -> Result<Vec<String>, Error> {
-        let text = self.read("logs.jsonl")?.unwrap_or_default();
+    fn lines(&self, name: &str) -> Result<Vec<String>, Error> {
+        let text = self.read(name)?.unwrap_or_default();
         let end = text.rfind('\n').map_or(0, |i| i + 1);
         Ok(text[..end].lines().map(str::to_string).collect())
+    }
+
+    fn append(&self, name: &str, text: &str) -> Result<(), Error> {
+        let mut file = fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(self.dir.join(name))?;
+        file.write_all(text.as_bytes())?;
+        Ok(())
     }
 }
 
@@ -77,7 +89,7 @@ impl ChainStore for FileStore {
     }
 
     fn logs(&self) -> Result<Vec<RawLog>, Error> {
-        Ok(RawLog::parse_jsonl(&self.log_lines()?.join("\n"))?)
+        Ok(RawLog::parse_jsonl(&self.lines("logs.jsonl")?.join("\n"))?)
     }
 
     fn append_logs(&mut self, logs: &[RawLog]) -> Result<(), Error> {
@@ -86,16 +98,11 @@ impl ChainStore for FileStore {
             text.push_str(&log.to_json().to_string());
             text.push('\n');
         }
-        let mut file = fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(self.dir.join("logs.jsonl"))?;
-        file.write_all(text.as_bytes())?;
-        Ok(())
+        self.append("logs.jsonl", &text)
     }
 
     fn truncate_logs(&mut self, block: u64) -> Result<usize, Error> {
-        let lines = self.log_lines()?;
+        let lines = self.lines("logs.jsonl")?;
         let logs = RawLog::parse_jsonl(&lines.join("\n"))?;
         let mut kept = String::new();
         let mut dropped = 0;
@@ -110,6 +117,27 @@ impl ChainStore for FileStore {
         // Also rewrites away any partial last line.
         self.replace("logs.jsonl", &kept)?;
         Ok(dropped)
+    }
+
+    fn txid_leaves(&self) -> Result<(Vec<[u8; 32]>, Option<String>), Error> {
+        let corrupt = || Error::Corrupt("txid leaves");
+        let mut leaves = Vec::new();
+        let mut last = None;
+        for line in self.lines("txid-leaves.txt")? {
+            let (id, leaf) = line.split_once(' ').ok_or_else(corrupt)?;
+            let leaf = hex::decode(leaf).map_err(|_| corrupt())?;
+            leaves.push(leaf.try_into().map_err(|_| corrupt())?);
+            last = Some(id.to_string());
+        }
+        Ok((leaves, last))
+    }
+
+    fn append_txid_leaves(&mut self, leaves: &[(String, [u8; 32])]) -> Result<(), Error> {
+        let mut text = String::new();
+        for (id, leaf) in leaves {
+            text.push_str(&format!("{id} {}\n", hex::encode(leaf)));
+        }
+        self.append("txid-leaves.txt", &text)
     }
 }
 
@@ -156,6 +184,18 @@ mod tests {
         assert_eq!(s.truncate_logs(5).unwrap(), 0);
         s.append_logs(&[log(6)]).unwrap();
         assert_eq!(s.logs().unwrap(), vec![log(1), log(6)]);
+    }
+
+    #[test]
+    fn txid_leaves_resume_after_the_last_complete_line() {
+        let mut s = store("txid");
+        s.append_txid_leaves(&[("a".into(), [1; 32]), ("b".into(), [2; 32])])
+            .unwrap();
+        s.append("txid-leaves.txt", "c 03").unwrap();
+        assert_eq!(
+            s.txid_leaves().unwrap(),
+            (vec![[1; 32], [2; 32]], Some("b".into()))
+        );
     }
 
     #[test]

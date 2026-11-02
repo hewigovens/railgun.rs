@@ -26,3 +26,17 @@ lint:
 # Example: just wallet arbitrum https://arb1.arbitrum.io/rpc data/chain mnemonic.txt balance
 wallet *args:
   cargo run --release -p rg-core --example wallet -- "$@"
+
+# Swift bindings into build/bindings.
+ffi:
+  bash scripts/ffi.sh
+
+# Also the XCFramework for macOS, iOS and the iOS simulator.
+ffi-apple:
+  bash scripts/ffi.sh xcframework
+
+# Compiles the bindings with the smoke test and runs it. Set RG_MNEMONIC_FILE for the live part.
+test-swift: ffi
+  swiftc -O -o build/smoke crates/rg-uniffi/tests/swift/main.swift build/bindings/RailgunCore.swift \
+    -I build/bindings/Headers -L target/release -lrg_uniffi
+  DYLD_LIBRARY_PATH=target/release build/smoke

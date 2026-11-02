@@ -15,8 +15,9 @@ don't say.
 | M4 prove and submit one transfer | done on Arbitrum; the Anon wallet received it |
 | M5 POI | done on Arbitrum: a Rust proof reached `Valid`, Anon shows the funds spendable |
 | Unshield, several inputs | done on Arbitrum, each with POI `Valid` |
+| Bindings | Swift through `rg-uniffi`, run on macOS and an iOS simulator against live Arbitrum |
 
-Tests: `cargo test --workspace` gives 66 passed, 2 ignored (the M3 full-history test
+Tests: `cargo test --workspace` gives 67 passed, 2 ignored (the M3 full-history test
 needs Sepolia `data/`, the M4 witness and proof test needs circuit artifacts). Two tests
 skip quietly without `.test-wallet/sepolia-test-mnemonic.txt`.
 
@@ -72,10 +73,16 @@ $W poi <tx hash> --submit
 `poi` needs the squid and aggregator to have the transaction, usually under a minute. Do
 not leave a wallet holding these keys open in Railway, or it submits POI first.
 
+## Bindings
+
+`just ffi` writes Swift bindings to `build/bindings`, and `just ffi-apple` also builds `build/RailgunFFI.xcframework` for macOS, iOS and the iOS simulator. `just test-swift` runs `crates/rg-uniffi/tests/swift/main.swift` offline; set `RG_MNEMONIC_FILE`, `RG_RPC`, `RG_DATA`, `RG_FROM`, `RG_RECIPIENT`, `RG_TOKEN` and optionally `RG_POI_TX` to run the live part, which sends nothing.
+
+Android needs the NDK on the machine, because `ring` compiles C: `cargo check --target aarch64-linux-android` fails in its build script here. Kotlin bindings are not generated yet.
+
 ## Store
 
 `rg_core::FileStore` keeps inputs (seed, logs, a cursor) and replays them on open: about
-two seconds for Arbitrum's 133k leaves on an M-series Mac. Nothing derived is stored, so a
+two seconds for Arbitrum's 133k leaves on an M-series Mac. `txid-leaves.txt` caches txid tree leaves older than the reorg window, which took a POI proof from about 29 s to 8 s. Nothing derived is stored, so a
 real database can wait until this is too slow on a phone. Each sync refetches the
 network's `reorg_window` of blocks, 64 or 2,400 on Arbitrum, which also clears anything a
 crash left past the cursor.
@@ -142,6 +149,5 @@ The 1x2 zkey has the same hash as the production one.
 
 - Spending across trees, which needs one transaction per tree.
 - Unshield to native ETH (relay adapt), broadcaster fees, NFTs.
-- `prove_poi` rebuilds the whole txid tree each time, about 30 s on Arbitrum.
 - Decoding legacy (pre-V2.1) events, so older wallets can scan.
-- UniFFI bindings; device timings on iPhone, Mac and Android.
+- Kotlin bindings and an Android build; timings on a real iPhone and Android device.

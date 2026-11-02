@@ -11,6 +11,7 @@ members = [
   "crates/rg-tx",
   "crates/rg-poi",
   "crates/rg-core",
+  "crates/rg-uniffi",
 ]
 
 [workspace.package]
@@ -44,6 +45,7 @@ hmac = "0.12"
 rand = "0.8"
 rayon = "1"
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+rg-core = { path = "crates/rg-core" }
 rg-keys = { path = "crates/rg-keys" }
 rg-notes = { path = "crates/rg-notes" }
 rg-poi = { path = "crates/rg-poi" }
@@ -58,6 +60,7 @@ serde_json = "1"
 sha2 = "0.10"
 thiserror = "2"
 tiny-keccak = { version = "2", features = ["keccak"] }
+uniffi = { version = "0.32", default-features = false }
 wasmi = "2"
 wasmtime = { version = "50", default-features = false, features = ["cranelift", "runtime", "std"] }
 

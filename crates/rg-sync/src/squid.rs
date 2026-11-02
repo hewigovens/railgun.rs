@@ -9,6 +9,8 @@ const PAGE: usize = 10_000;
 /// A Railgun transaction as the squid records it, legacy ones included. Their order by id is the order of the txid tree.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SquidTransaction {
+    pub id: String,
+    pub block_number: u64,
     pub transaction_hash: [u8; 32],
     pub nullifiers: Vec<[u8; 32]>,
     /// With an unshield, its commitment comes last and takes no tree position.
@@ -35,6 +37,8 @@ fn number(v: &Value) -> Option<u64> {
 
 fn transaction(v: &Value) -> Option<SquidTransaction> {
     Some(SquidTransaction {
+        id: v["id"].as_str()?.to_string(),
+        block_number: number(&v["blockNumber"])?,
         transaction_hash: word(&v["transactionHash"])?,
         nullifiers: words(&v["nullifiers"])?,
         commitments: words(&v["commitments"])?,
@@ -54,16 +58,18 @@ fn query(http: &reqwest::blocking::Client, url: &str, query: String) -> Result<V
         .map_err(|e| Error::Rpc(e.to_string()))
 }
 
-/// Every Railgun transaction, in txid tree order.
-pub fn fetch_transactions(url: &str) -> Result<Vec<SquidTransaction>, Error> {
+const TRANSACTION_FIELDS: &str = "id blockNumber transactionHash nullifiers commitments \
+     hasUnshield boundParamsHash utxoTreeIn utxoTreeOut utxoBatchStartPositionOut";
+
+/// Railgun transactions after the id `after`, in txid tree order. An empty id reads from the start.
+pub fn fetch_transactions_after(url: &str, after: &str) -> Result<Vec<SquidTransaction>, Error> {
     let http = reqwest::blocking::Client::new();
     let mut out = Vec::new();
-    let mut last_id = String::new();
+    let mut last_id = after.to_string();
     loop {
         let q = format!(
             "{{ transactions(orderBy: id_ASC, limit: {PAGE}, where: {{id_gt: \"{last_id}\"}}) \
-             {{ id transactionHash nullifiers commitments hasUnshield boundParamsHash \
-             utxoTreeIn utxoTreeOut utxoBatchStartPositionOut }} }}"
+             {{ {TRANSACTION_FIELDS} }} }}"
         );
         let resp = query(&http, url, q)?;
         let page = resp["data"]["transactions"]
@@ -77,6 +83,22 @@ pub fn fetch_transactions(url: &str) -> Result<Vec<SquidTransaction>, Error> {
             _ => return Ok(out),
         }
     }
+}
+
+/// The Railgun transaction in one EVM transaction, if the squid has it. A batch holds several; this core only makes single ones.
+pub fn fetch_transaction(url: &str, hash: &[u8; 32]) -> Result<Option<SquidTransaction>, Error> {
+    let http = reqwest::blocking::Client::new();
+    let q = format!(
+        "{{ transactions(where: {{transactionHash_eq: \"0x{}\"}}) {{ {TRANSACTION_FIELDS} }} }}",
+        hex::encode(hash)
+    );
+    let resp = query(&http, url, q)?;
+    let page = resp["data"]["transactions"]
+        .as_array()
+        .ok_or_else(|| Error::Rpc(format!("squid: {resp}")))?;
+    page.first()
+        .map(|v| transaction(v).ok_or_else(|| Error::Rpc(format!("squid tx: {v}"))))
+        .transpose()
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

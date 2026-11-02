@@ -1,0 +1,4 @@
+[crates.rg_uniffi.bindings.swift]
+module_name = "RailgunCore"
+ffi_module_name = "RailgunFFI"
+generate_immutable_records = true
