@@ -1,5 +1,6 @@
 package dev.hewig.railgun.smoke
 
+import dev.hewig.railgun.EvmAccount
 import dev.hewig.railgun.RailgunClient
 import dev.hewig.railgun.RailgunException
 import dev.hewig.railgun.Wallet
@@ -23,6 +24,10 @@ class OfflineSmoke {
         Check.raises<RailgunException.InvalidInput>("mnemonic not UTF-8") {
             byteArrayOf(-1).toSecretBuffer().useOnce { Wallet.fromMnemonic(it, 0u) }
         }
+
+        val test = "test test test test test test test test test test test junk"
+        val account = test.toByteArray().toSecretBuffer().useOnce { EvmAccount.fromMnemonic(it, 0u) }
+        Check.that(account.address() == "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266", "standard EVM account")
 
         val dataDir = Files.createTempDirectory("rg-smoke").toString()
         Check.raises<RailgunException.InvalidInput>("unknown network") {

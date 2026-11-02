@@ -72,8 +72,10 @@ flowchart LR
 ```
 
 Artifacts are downloaded when a circuit is first needed and hash-checked on every load.
-The core never signs EVM transactions. It prints calldata, and `harness/send.js` or any
-wallet sends it.
+`Client::send` signs an EIP-1559 transaction with an `EvmKey` and sends it. That account pays
+gas and is public: it is derived on the standard path `m/44'/60'/0'/0/i` or loaded from a key,
+and never from Railgun's spending or viewing keys. A broadcaster would hide it; there is none
+yet. `UnsignedTx` stays available for any other wallet to send.
 
 ## Sync and scan
 
@@ -168,6 +170,7 @@ The core never stores a key. `FileStore` holds chain data only, and a shell keep
 | Spending and viewing keys | `PrivateKey`: not `Copy`, never printed, wiped on drop. Only `expose()` reads them. |
 | `WalletKeys` | Not `Clone`, wiped on drop, and `Debug` shows only the master public key. `Wallet` drops it on Kotlin's `close()` or Swift's last release. |
 | Seed, BIP32 nodes, BIP39 entropy and words | Wiped on drop. |
+| `EvmKey`, the gas account | k256 `SigningKey`, wiped on drop, `Debug` shows only the address. |
 | EdDSA and Ed25519 working values, including the signing nonce | Wiped when the call returns. |
 | Mnemonic entering the core | `&[u8]` borrows the shell's own `Data` or direct `ByteBuffer`, with no UniFFI copy. The shell wipes that buffer after the call. |
 

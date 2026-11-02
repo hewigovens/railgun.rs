@@ -114,4 +114,10 @@ sol! {
     function transact(Transaction[] _transactions) external payable;
 
     function rootHistory(uint256 tree, bytes32 root) external view returns (bool);
+
+    function approve(address spender, uint256 amount) external returns (bool);
+
+    function allowance(address owner, address spender) external view returns (uint256);
+
+    function balanceOf(address owner) external view returns (uint256);
 }

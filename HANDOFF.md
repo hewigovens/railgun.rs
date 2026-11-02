@@ -54,8 +54,7 @@ Local state, all gitignored:
 - `data/chain/arbitrum/`, `data/chain/artifacts/` (downloaded on demand), `data/artifacts/1x2`
   (lite, for the ignored M4 test)
 
-Sender holds 0.00001 WETH. The EOA has about 0.00042 ETH and 0.000029925 WETH. With `harness` installed
-(`npm install --ignore-scripts`) and `$RECIPIENT` a 0zk address:
+Sender holds 0.00001 WETH. The EOA has about 0.00042 ETH and 0.000029925 WETH. With `$RECIPIENT` a 0zk address:
 
 ```
 W="cargo run --release -p rg-core --example wallet -- arbitrum https://arb1.arbitrum.io/rpc data/chain .test-wallet/test-mnemonic.txt"
@@ -65,7 +64,8 @@ $W balance
 $W transfer $RECIPIENT $WETH <value> > .test-wallet/transfer.jsonl
 $W unshield <to> $WETH <value> > .test-wallet/transfer.jsonl   # instead of transfer
 $W estimate <eoa> .test-wallet/transfer.jsonl
-node harness/send.js send https://arb1.arbitrum.io/rpc .test-wallet/test-eoa.key .test-wallet/transfer.jsonl
+$W send .test-wallet/test-eoa.key .test-wallet/transfer.jsonl
+$W shield .test-wallet/test-eoa.key $WETH <value>   # approve if needed, then shield to the sender
 $W sync
 $W poi <tx hash> --submit
 ```
@@ -82,6 +82,12 @@ not leave a wallet holding these keys open in Railway, or it submits POI first.
 Android coverage so far: the `wallet` example, built with the NDK, ran on an Android 16 arm64 emulator against live Arbitrum: sync 2.9 s, transfer with proving 2.9 s, POI 9.9 s with cached circuits and leaves. The Kotlin bindings have not run inside an Android app, so loading `librg_uniffi.so` through JNA on Android is untested. Emulator times come from this M4 Pro, not a phone.
 
 Mnemonics cross as bytes. `Wallet.fromMnemonic` takes `Data` in Swift and a direct `ByteBuffer` in Kotlin and borrows them, and `generateMnemonic` returns `Data` or `ByteArray`. The shell wipes its buffer; the smoke tests show how.
+
+## Sending
+
+`Client::send` signs EIP-1559 with an `EvmKey` (k256, RFC 6979, low s) and sends: nonce from `pending`, max fee twice the base fee plus `eth_maxPriorityFeePerGas`, gas limit the estimate plus 20% because rollup estimates move with the L1 fee. It returns the hash at once and `Client::receipt` polls. Signing matches ethers 6.14 byte for byte. `build_approve`, `allowance` and `build_shield` cover shielding.
+
+Not yet sent on the real chain. On an anvil fork of Arbitrum (`anvil --fork-url https://arb1.arbitrum.io/rpc`), with the test keys: approve 53,428 gas, shield 778,788, a transfer and an unshield each about 1.1M, all sent and mined from Rust, Swift and Kotlin, with balances right after sync (shield fee 0.25%). Anvil answers 1 gwei for the priority fee where Arbitrum answers 0, so a fork needs `anvil_setBalance` on the payer. Smoke tests send only with `RG_SEND_KEY_FILE`, so point `RG_RPC` at a fork.
 
 ## Store
 
@@ -155,5 +161,6 @@ The 1x2 zkey has the same hash as the production one.
 - Unshield to native ETH (relay adapt), broadcaster fees, NFTs.
 - Decoding legacy (pre-V2.1) events, so older wallets can scan.
 - A small Android app to load the bindings through JNA; timings on a real iPhone and Android device.
-- Signing and sending the public transaction from Rust, and shielding through `Client`. `harness/send.js` signs today, and `rg-tx` only has `shield_calldata`.
+- Shielding native ETH, which needs wrapping first or the relay adapt contract. `shield` takes ERC20s.
+- Gas from a broadcaster, so the paying account does not show on chain.
 - A view-only `Wallet`, so scanning needs no spending key and the shell can gate that key behind biometrics.

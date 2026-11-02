@@ -27,7 +27,7 @@ pub struct Unshield {
     pub value: u128,
 }
 
-/// A call for any funded account to sign and send.
+/// A call for any funded account to sign and send; [`Client::send`] does both.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct UnsignedTx {
     pub chain_id: u64,

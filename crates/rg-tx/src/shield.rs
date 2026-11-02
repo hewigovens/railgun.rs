@@ -55,6 +55,15 @@ pub fn shield_calldata(
     .abi_encode())
 }
 
+/// `token.approve(spender, value)`.
+pub fn approve_calldata(spender: [u8; 20], value: u128) -> Vec<u8> {
+    abi::approveCall {
+        spender: Address::from(spender),
+        amount: U256::from(value),
+    }
+    .abi_encode()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

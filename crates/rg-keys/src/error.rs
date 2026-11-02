@@ -8,4 +8,8 @@ pub enum Error {
     InvalidAddress(&'static str),
     #[error("incorrect address version {0}")]
     AddressVersion(u8),
+    #[error("invalid EVM key")]
+    InvalidEvmKey,
+    #[error("signing failed")]
+    Signing,
 }

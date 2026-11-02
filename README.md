@@ -117,7 +117,7 @@ Timings for one 1x2 transfer on this machine (4-core 2.1 GHz Xeon, release):
 ## Mainnet and POI
 
 `rg_core::Client` syncs, scans, builds transfers and proves POI. Its `wallet` example is a
-command line over that, and `harness/send.js` sends from a test EOA. `HANDOFF.md` has the
+command line over that, including signing and sending from a gas account and shielding. `HANDOFF.md` has the
 commands and where the POI artifacts come from.
 
 ## Rust to TS check

@@ -28,6 +28,10 @@ pub enum Error {
     NoSquid(&'static str),
     #[error("proof does not verify against the artifacts' key")]
     BadProof,
+    #[error("not an address: {0}")]
+    BadAddress(String),
+    #[error("transaction is for chain {0}, this client is on chain {1}")]
+    WrongChain(u64, u64),
     #[error("transaction {0} is not one this wallet can prove: {1}")]
     NotProvable(String, &'static str),
 }

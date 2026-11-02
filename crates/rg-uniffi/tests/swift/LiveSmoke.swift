@@ -1,6 +1,6 @@
 import Foundation
 
-/// Runs against a live node when `RG_MNEMONIC_FILE` is set, and sends nothing.
+/// Runs against a live node when `RG_MNEMONIC_FILE` is set. Sends only with `RG_SEND_KEY_FILE`, so point `RG_RPC` at a fork for that.
 struct LiveSmoke {
     private let mnemonicFile: String
     private let rpcUrl: String
@@ -9,6 +9,7 @@ struct LiveSmoke {
     private let recipient: String
     private let token: String
     private let poiTransaction: String?
+    private let sendKeyFile: String?
 
     init?(environment: [String: String]) {
         guard let mnemonicFile = environment["RG_MNEMONIC_FILE"], !mnemonicFile.isEmpty else {
@@ -21,6 +22,7 @@ struct LiveSmoke {
         recipient = environment["RG_RECIPIENT", default: ""]
         token = environment["RG_TOKEN", default: ""]
         poiTransaction = environment["RG_POI_TX"]
+        sendKeyFile = environment["RG_SEND_KEY_FILE"]
     }
 
     func run() throws {
@@ -46,6 +48,37 @@ struct LiveSmoke {
             try print("poi valid: \(client.poiIsValid(submission: proof))")
         }
         print("live checks passed")
+
+        if let sendKeyFile {
+            try send(transaction, with: client, wallet: wallet, keyFile: sendKeyFile)
+        }
+    }
+
+    private func send(_ transfer: UnsignedTx, with client: RailgunClient, wallet: Wallet, keyFile: String) throws {
+        var key = try Data(hex: String(contentsOfFile: keyFile, encoding: .utf8))
+        defer { key.wipe() }
+        let account = try EvmAccount.fromPrivateKey(privateKey: key)
+        let value = "1000000000000"
+        if try (Decimal(string: client.allowance(owner: account.address(), token: token)) ?? 0) < (Decimal(string: value) ?? 0) {
+            try sendAndWait(client.buildApprove(token: token, value: value), from: account, with: client)
+        }
+        try sendAndWait(client.buildShield(receiver: wallet.address(), token: token, value: value), from: account, with: client)
+        try sendAndWait(transfer, from: account, with: client)
+        print("send checks passed")
+    }
+
+    private func sendAndWait(_ transaction: UnsignedTx, from account: EvmAccount, with client: RailgunClient) throws {
+        let hash = try client.send(account: account, tx: transaction)
+        var receipt: Receipt?
+        for _ in 0 ..< 120 {
+            receipt = try client.receipt(txHash: hash)
+            if receipt != nil {
+                break
+            }
+            Thread.sleep(forTimeInterval: 1)
+        }
+        print("\(hash): \(String(describing: receipt))")
+        Check.that(receipt?.success == true, "transaction succeeded")
     }
 
     private func transfer(_ value: String, with client: RailgunClient, wallet: Wallet) throws -> UnsignedTx {

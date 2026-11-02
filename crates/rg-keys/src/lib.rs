@@ -3,9 +3,11 @@
 pub mod address;
 pub mod bip32;
 mod error;
+mod evm_key;
 pub mod keys;
 
 pub use address::{AddressData, Chain, decode_address, encode_address};
 pub use error::Error;
+pub use evm_key::{EvmKey, EvmSignature};
 pub use keys::{WalletKeys, generate_mnemonic};
 pub use rg_primitives::{PrivateKey, Zeroizing};

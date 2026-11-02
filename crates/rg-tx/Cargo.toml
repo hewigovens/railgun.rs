@@ -9,6 +9,7 @@ description = "Railgun private transfers: bound params, signing, circuit inputs 
 
 [dependencies]
 alloy-primitives.workspace = true
+alloy-rlp.workspace = true
 alloy-sol-types.workspace = true
 rg-keys.workspace = true
 rg-notes.workspace = true

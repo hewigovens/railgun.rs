@@ -16,6 +16,10 @@ struct OfflineSmoke {
             try Wallet.fromMnemonic(mnemonic: Data([0xFF]), index: 0)
         }
 
+        let test = Data("test test test test test test test test test test test junk".utf8)
+        let account = try EvmAccount.fromMnemonic(mnemonic: test, index: 0)
+        Check.that(account.address() == "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266", "standard EVM account")
+
         let dataDir = NSTemporaryDirectory() + "rg-smoke-\(UUID().uuidString)"
         try Check.raises(RailgunError.self, where: \.isInvalidInput, "unknown network") {
             try RailgunClient.open(network: "mars", rpcUrl: "http://localhost:1", dataDir: dataDir)

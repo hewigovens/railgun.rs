@@ -16,4 +16,6 @@ pub enum Error {
     BadProof,
     #[error("bad verifying key: {0}")]
     BadKey(&'static str),
+    #[error("signing: {0}")]
+    Signing(#[from] rg_keys::Error),
 }

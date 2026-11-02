@@ -21,4 +21,6 @@ pub enum Error {
     },
     #[error("rpc: {0}")]
     Rpc(String),
+    #[error("node refused: {0}")]
+    Refused(String),
 }
