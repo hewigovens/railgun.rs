@@ -12,7 +12,7 @@ commands. This file is what the cloud session knew that those two don't say.
 | M2 notes, EdDSA, Ed25519 blinding, AES | done, byte-equal to the engine |
 | M3 Sepolia sync, tree, scan | done, matches the engine on all of Sepolia to block 12031295 |
 | M4 prove and submit one transfer | done on Arbitrum; the Anon wallet received it |
-| M5 POI | proving works; the aggregator has not accepted a proof yet |
+| M5 POI | Rust proving works; the first transfer went `Valid` only after Railway handled it |
 
 Tests: `cargo test --workspace` gives 55 passed, 2 ignored (the M3 full-history test
 needs `data/`, the M4 witness and proof test needs circuit artifacts). Two of the 48
@@ -81,11 +81,16 @@ but this node only forwards to the list provider and swallows errors from it, an
 minutes the outputs stay `Missing` with no queue or event change. Those requests are not
 checked against `POIValidation.assertIsValidSpendableTXID` locally yet.
 
-Other Arbitrum senders do reach `Valid`: 50 of the last 60 unshields, including one-off
-senders. Their txs all have unshields, ours does not. Ideas, in order: import the sender
-mnemonic into Railway and see whether it gets the same outputs to `Valid`; validate the
-single-commitment data with the engine; try a transfer with an unshield; ask the Railgun
-maintainers what the deployed node runs (the public repo stops at February 2025).
+Update: with the sender mnemonic imported into Railway, both outputs went `Valid` on
+2026-11-02 at 09:11 local, about 16 minutes after a Railway restart and 82 minutes after
+the `--single` submission. So the aggregator accepts this transaction, and it reports
+`Valid` for the blinded commitments Rust computed. Railway's request was not captured, so
+nothing yet shows what differs from ours, and a late `--single` is not strictly ruled out.
+This transaction can no longer be used as a test: it is already in the list.
+
+Next: send a new transfer from the sender wallet (quit Railway first, or it will submit
+POI itself), submit with `submit_poi`, and compare with a request captured from Railway's
+network log for a separate transfer.
 
 ## Circuit artifacts
 
