@@ -21,7 +21,8 @@ pub type PoiStatus = BTreeMap<String, String>;
 /// A POI proof ready to submit. `data` is `TransactProofData`.
 #[derive(Clone, Debug)]
 pub struct PoiProof {
-    pub blinded_out: Vec<String>,
+    /// What to ask the aggregator about: blinded commitment and its kind.
+    pub blinded: Vec<(String, &'static str)>,
     pub data: Value,
 }
 
@@ -60,7 +61,7 @@ impl<S: ChainStore> Client<S> {
         Node::new(AGGREGATOR, self.network.chain_id)
     }
 
-    /// Proves POI for a private transfer this wallet sent. `dir` holds the POI
+    /// Proves POI for a transaction this wallet sent. `dir` holds the POI
     /// 3x3 `circuit.wasm` and `circuit.zkey`. The wallet must be synced past the
     /// transaction, and every note it spent must already be in the list.
     pub fn prove_poi(
@@ -95,9 +96,9 @@ impl<S: ChainStore> Client<S> {
             })
             .collect();
 
+        let notes_out = &tx.commitments[..tx.commitments.len() - usize::from(tx.has_unshield)];
         let start = tx.utxo_batch_start_position_out;
-        let sent = tx
-            .commitments
+        let sent = notes_out
             .iter()
             .enumerate()
             .map(|(i, c)| {
@@ -108,7 +109,7 @@ impl<S: ChainStore> Client<S> {
                 })
             })
             .collect::<Option<Vec<_>>>()
-            .ok_or_else(|| unprovable("an output is not ours, or it has an unshield"))?;
+            .ok_or_else(|| unprovable("an output is not ours"))?;
         let outputs: Vec<OutputNote> = sent
             .iter()
             .map(|s| OutputNote {
@@ -124,6 +125,13 @@ impl<S: ChainStore> Client<S> {
             .map(|(i, (s, o))| blinded_commitment(&fr(&s.commitment), &o.npk, start_out + i as u64))
             .collect();
 
+        let unshield_txid = tx.has_unshield.then(|| {
+            railgun_txid(
+                &frs(&tx.nullifiers),
+                &frs(&tx.commitments),
+                &fr(&tx.bound_params_hash),
+            )
+        });
         let inputs = ProofInputs {
             txid_proof: trees.proof(index as u64)?,
             bound_params_hash: fr(&tx.bound_params_hash),
@@ -143,6 +151,7 @@ impl<S: ChainStore> Client<S> {
             utxo_tree_in: tx.utxo_tree_in,
             outputs,
             global_position_out: start_out,
+            unshield_txid,
             list_proofs: self.node().merkle_proofs(REQUIRED_LIST, &blinded_in)?,
         };
 
@@ -155,15 +164,22 @@ impl<S: ChainStore> Client<S> {
         let p = rg_prover::proof_to_json(&proof);
         let two = |v: &Value| json!(v.as_array().map(|a| &a[..2]));
         let blinded_out: Vec<String> = blinded_out.iter().map(blinded_hex).collect();
+        // The aggregator tracks an unshield by its txid (`getForUnshield`).
+        let unshield = unshield_txid.as_ref().map(blinded_hex);
         let data = json!({
             "snarkProof": {"pi_a": two(&p["pi_a"]), "pi_b": two(&p["pi_b"]), "pi_c": two(&p["pi_c"])},
             "poiMerkleroots": inputs.list_proofs.iter().map(|l| hex32(&l.root)).collect::<Vec<_>>(),
             "txidMerkleroot": hex32(&inputs.txid_proof.root),
             "txidMerklerootIndex": txs.len() - 1,
             "blindedCommitmentsOut": blinded_out,
-            "railgunTxidIfHasUnshield": "0x00",
+            "railgunTxidIfHasUnshield": unshield.as_deref().unwrap_or("0x00"),
         });
-        Ok(PoiProof { blinded_out, data })
+        let blinded = blinded_out
+            .into_iter()
+            .map(|b| (b, "Transact"))
+            .chain(unshield.map(|b| (b, "Unshield")))
+            .collect();
+        Ok(PoiProof { blinded, data })
     }
 
     pub fn submit_poi(&self, proof: &PoiProof) -> Result<(), Error> {
@@ -172,8 +188,7 @@ impl<S: ChainStore> Client<S> {
             .submit_transact_proof(REQUIRED_LIST, proof.data.clone())?)
     }
 
-    pub fn poi_status(&self, blinded: &[String]) -> Result<PoiStatus, Error> {
-        let items: Vec<_> = blinded.iter().map(|b| (b.clone(), "Transact")).collect();
-        Ok(self.node().pois_per_list(REQUIRED_LIST, &items)?)
+    pub fn poi_status(&self, proof: &PoiProof) -> Result<PoiStatus, Error> {
+        Ok(self.node().pois_per_list(REQUIRED_LIST, &proof.blinded)?)
     }
 }

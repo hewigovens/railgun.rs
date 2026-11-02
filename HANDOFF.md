@@ -13,9 +13,10 @@ don't say.
 | M2 notes, EdDSA, Ed25519 blinding, AES | done, byte-equal to the engine |
 | M3 Sepolia sync, tree, scan | done, matches the engine on all of Sepolia to block 12031295 |
 | M4 prove and submit one transfer | done on Arbitrum; the Anon wallet received it |
-| M5 POI | done on Arbitrum for transfers: a Rust proof reached `Valid`, Anon shows the funds spendable |
+| M5 POI | done on Arbitrum: a Rust proof reached `Valid`, Anon shows the funds spendable |
+| Unshield, several inputs | done on Arbitrum, each with POI `Valid` |
 
-Tests: `cargo test --workspace` gives 59 passed, 2 ignored (the M3 full-history test
+Tests: `cargo test --workspace` gives 65 passed, 2 ignored (the M3 full-history test
 needs Sepolia `data/`, the M4 witness and proof test needs circuit artifacts). Two tests
 skip quietly without `.test-wallet/sepolia-test-mnemonic.txt`.
 
@@ -26,9 +27,14 @@ M4 checks that pass, against engine 9.6.0 with randoms pinned:
 - recipient decrypts the Rust-built note; change comes back to the sender
 - `rg_core::Client::build_transfer` runs the whole path in Rust
 
-First real transfer: Arbitrum tx
-`0xb4988c76c999a60d702bff903a5f9934504eed945eb34a47466c9426f89f7db2`, block 520397232,
-1,006,352 gas, 0.00025 WETH to the Anon 0zk with the change back to the sender.
+Arbitrum transactions from Rust:
+
+| Tx | What | Gas |
+| --- | --- | --- |
+| `0xb4988c76c999a60d702bff903a5f9934504eed945eb34a47466c9426f89f7db2` | first transfer, to Anon | 1,006,352 |
+| `0x66b1c989088cc3cea55d6bab333ebcc86365ac3b34b763348d1c2d5013d15c1c` | unshield 0.00003 WETH to the EOA | 1,100,961 |
+| `0xff75d2af67945181c1454117329deee14225b8a5891db1ce8c481f6dbe500155` | transfer to self, to split a note | 1,066,500 |
+| `0x19cbad9383a44758b0ff7ce1934d8052d9d6a33567fe817a13c07e228083135a` | two notes in, 0.00011 WETH to Anon | 1,068,979 |
 
 ## Mainnet sync and sending
 
@@ -46,15 +52,16 @@ Local state, all gitignored:
   recipient 0zk, EOA)
 - `data/chain/arbitrum/`, `data/artifacts/{1x1,1x2,1x3,poi-3x3}`
 
-Sender holds 0.00015 WETH, the EOA about 0.00046 ETH. With `harness` installed
+Sender holds 0.00001 WETH. The EOA has about 0.00042 ETH and 0.000029925 WETH. With `harness` installed
 (`npm install --ignore-scripts`) and `$RECIPIENT` a 0zk address:
 
 ```
 W="cargo run --release -p rg-core --example wallet -- arbitrum https://arb1.arbitrum.io/rpc data/chain .test-wallet/test-mnemonic.txt"
-WETH=0x82aF49447D8a07e3bd95BD0d56f35241523fbab1
+WETH=0x82aF49447D8a07e3bd95BD0d56f35241523fBab1
 $W sync
 $W balance
 $W transfer data/artifacts $RECIPIENT $WETH <value> > .test-wallet/transfer.jsonl
+$W unshield data/artifacts <to> $WETH <value> > .test-wallet/transfer.jsonl   # instead of transfer
 $W estimate <eoa> .test-wallet/transfer.jsonl
 node harness/send.js send https://arb1.arbitrum.io/rpc .test-wallet/test-eoa.key .test-wallet/transfer.jsonl
 $W sync
@@ -98,8 +105,11 @@ cp <engine>/src/test/test-artifacts-lite/1x2/vkey.json <artifacts>/1x2/
 ```
 
 The lite 1x1, 1x2, 2x1 and 1x3 keys equal Sepolia's on-chain keys (set at block
-10028485, IPFS hash QmWFEVTTH3kdFxA8GLUKnCNZe5JwTVy7nJi2HgnzbVBLF4). There is no 2x2
-in the lite set, so `plan_transfer` spends one note only.
+10028485, IPFS hash QmWFEVTTH3kdFxA8GLUKnCNZe5JwTVy7nJi2HgnzbVBLF4). Other shapes are not
+in the lite set. Fetch them from `https://ipfs-lb.com/ipfs/QmUsmnK4PFc7zDp2cmC4wBZxYLjNyRgWfs5GNcJJ2uLcpU/`:
+`circuits/02x02/{vkey.json,zkey.br}` and `prover/snarkjs/02x02.wasm.br`, decompressed the
+same way into `<artifacts>/2x2/`. The 2x2 key equals Arbitrum's. A missing shape fails
+as a file error when proving.
 
 ## Things learned the hard way
 
@@ -136,9 +146,9 @@ in the lite set, so `plan_transfer` spends one note only.
 
 ## Open items
 
-- POI for shields and unshields; 13x13 for larger transactions.
-- Several inputs (2x2 needs production artifacts from IPFS), unshield, relay adapt,
-  broadcaster fees.
+- 13x13 POI, for transactions over three inputs or outputs.
+- Spending across trees, which needs one transaction per tree.
+- Unshield to native ETH (relay adapt), broadcaster fees, NFTs.
 - Artifact download and hash checks.
 - Decoding legacy (pre-V2.1) events, so older wallets can scan.
 - UniFFI bindings; device timings on iPhone, Mac and Android.

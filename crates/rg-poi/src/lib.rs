@@ -114,7 +114,7 @@ pub struct SpentNote {
     pub position: u32,
 }
 
-/// A created note. Unshields are not supported yet.
+/// A created note; an unshield has none, so it is not one of these.
 #[derive(Clone, Debug)]
 pub struct OutputNote {
     pub npk: Fr,
@@ -129,7 +129,7 @@ pub struct ListProof {
     pub elements: [Fr; TREE_DEPTH],
 }
 
-/// `POIEngineProofInputs` for a transaction without an unshield.
+/// `POIEngineProofInputs`.
 #[derive(Clone, Debug)]
 pub struct ProofInputs {
     pub txid_proof: MerkleProof,
@@ -143,6 +143,8 @@ pub struct ProofInputs {
     pub utxo_tree_in: u32,
     pub outputs: Vec<OutputNote>,
     pub global_position_out: u64,
+    /// The Railgun txid, when the last commitment is an unshield.
+    pub unshield_txid: Option<Fr>,
     pub list_proofs: Vec<ListProof>,
 }
 
@@ -205,7 +207,10 @@ impl ProofInputs {
                 "utxoBatchGlobalStartPositionOut",
                 vec![Fr::from(self.global_position_out)],
             ),
-            signal("railgunTxidIfHasUnshield", vec![none]),
+            signal(
+                "railgunTxidIfHasUnshield",
+                vec![self.unshield_txid.unwrap_or(none)],
+            ),
             signal(
                 "railgunTxidMerkleProofIndices",
                 vec![Fr::from(self.txid_proof.indices)],
@@ -228,7 +233,7 @@ impl ProofInputs {
         let zero = zero_value();
         let mut out = pad(blinded_out.to_vec(), n, Fr::from(0u64));
         out.push(self.txid_proof.root);
-        out.push(Fr::from(0u64));
+        out.push(self.unshield_txid.unwrap_or(Fr::from(0u64)));
         let roots = self.list_proofs.iter().map(|p| p.root).collect();
         out.extend(pad(roots, n, zero));
         out
@@ -285,6 +290,31 @@ mod tests {
             blinded_commitment(&commitments[0], &Fr::from(12345u64), position),
             word("23e2b3c6bd1a0c1e4c01ee9458517c85a0544ddcd52575d1e57f6217b89ec7a4")
         );
+    }
+
+    #[test]
+    fn an_unshield_puts_its_txid_in_the_public_signals() {
+        let leaf = Fr::from(1u64);
+        let mut tree = MerkleTree::new();
+        tree.insert(0, &[leaf]).unwrap();
+        let txid = Fr::from(9u64);
+        let inputs = ProofInputs {
+            txid_proof: tree.proof(0).unwrap(),
+            bound_params_hash: Fr::from(0u64),
+            nullifiers: Vec::new(),
+            commitments_out: Vec::new(),
+            spending_public_key: [Fr::from(0u64); 2],
+            nullifying_key: Fr::from(0u64),
+            token_hash: Fr::from(0u64),
+            spent: Vec::new(),
+            utxo_tree_in: 0,
+            outputs: Vec::new(),
+            global_position_out: 0,
+            unshield_txid: Some(txid),
+            list_proofs: Vec::new(),
+        };
+        // Three blinded outputs, the txid root, then the unshield signal.
+        assert_eq!(inputs.public_inputs(MINI_CIRCUIT, &[])[4], txid);
     }
 
     #[test]

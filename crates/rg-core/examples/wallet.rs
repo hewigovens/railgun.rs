@@ -5,13 +5,13 @@
 //!   sync
 //!   balance
 //!   transfer <artifacts dir> <recipient 0zk> <token> <value> [memo]   prints JSONL for harness/send.js
-//!   estimate <from> <transfer jsonl>
+//!   unshield <artifacts dir> <to> <token> <value>                     prints the same
+//!   estimate <from> <transaction jsonl>
 //!   poi <artifacts dir>/poi-3x3 <tx hash> [--submit]
-//!   poi-status <blinded commitment>...
 
 use std::path::Path;
 
-use rg_core::{Client, FileStore, Transfer};
+use rg_core::{Client, FileStore, Transfer, Unshield, UnsignedTx};
 use rg_keys::WalletKeys;
 use rg_sync::Network;
 
@@ -28,6 +28,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .map_err(|_| "expected 32 bytes".into())
     };
 
+    let address = |s: &str| -> Result<[u8; 20], Box<dyn std::error::Error>> {
+        hex::decode(s.trim_start_matches("0x"))?
+            .try_into()
+            .map_err(|_| "expected 20 bytes".into())
+    };
+    let print_tx = |tx: &UnsignedTx| {
+        println!(
+            "{}",
+            serde_json::json!({"label": "transact", "to": tx.to, "value": "0", "data": tx.data_hex()})
+        );
+    };
+
     match a[5].as_str() {
         "sync" => println!("{:?}", client.sync()?),
         "balance" => {
@@ -36,21 +48,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         "transfer" => {
-            let token = hex::decode(a[8].trim_start_matches("0x"))?;
             let tx = client.build_transfer(
                 &keys,
                 &Transfer {
                     recipient: &a[7],
-                    token: token.try_into().map_err(|_| "expected 20 bytes")?,
+                    token: address(&a[8])?,
                     value: a[9].parse()?,
                     memo: a.get(10).map(String::as_str),
                 },
                 Path::new(&a[6]),
             )?;
-            println!(
-                "{}",
-                serde_json::json!({"label": "transact", "to": tx.to, "value": "0", "data": tx.data_hex()})
-            );
+            print_tx(&tx);
+        }
+        "unshield" => {
+            let tx = client.build_unshield(
+                &keys,
+                &Unshield {
+                    to: address(&a[7])?,
+                    token: address(&a[8])?,
+                    value: a[9].parse()?,
+                },
+                Path::new(&a[6]),
+            )?;
+            print_tx(&tx);
         }
         "estimate" => {
             let tx: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&a[7])?)?;
@@ -60,7 +80,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .ok_or("no data")?
                     .trim_start_matches("0x"),
             )?;
-            let tx = rg_core::UnsignedTx {
+            let tx = UnsignedTx {
                 chain_id: network.chain_id,
                 to: network.proxy.to_string(),
                 data,
@@ -69,13 +89,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         "poi" => {
             let proof = client.prove_poi(&keys, &hash(&a[7])?, Path::new(&a[6]))?;
-            println!("before: {:?}", client.poi_status(&proof.blinded_out)?);
+            println!("before: {:?}", client.poi_status(&proof)?);
             if a.get(8).is_some_and(|s| s == "--submit") {
                 client.submit_poi(&proof)?;
-                println!("after: {:?}", client.poi_status(&proof.blinded_out)?);
+                println!("after: {:?}", client.poi_status(&proof)?);
             }
         }
-        "poi-status" => println!("{:?}", client.poi_status(&a[6..])?),
         other => return Err(format!("unknown command {other}").into()),
     }
     Ok(())

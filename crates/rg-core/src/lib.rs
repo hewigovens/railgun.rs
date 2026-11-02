@@ -13,7 +13,7 @@ use rg_sync::{Network, SyncState};
 pub use poi::{PoiProof, PoiStatus};
 pub use store::{ChainStore, FileStore};
 pub use sync::SyncReport;
-pub use transfer::{Transfer, UnsignedTx};
+pub use transfer::{Transfer, Unshield, UnsignedTx};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {

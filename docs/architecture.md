@@ -37,7 +37,7 @@ flowchart BT
     tx --> primitives
     poi --> tree
     poi --> primitives
-    core["rg-core<br/>Client: store, sync, scan,<br/>transfers, POI"]
+    core["rg-core<br/>Client: store, sync, scan,<br/>transfers, unshields, POI"]
     core --> tx
     core --> poi
     core --> wallet
@@ -119,6 +119,10 @@ sequenceDiagram
     C-->>R: Transact and Nullified events
     R->>R: scan, decrypt note, status pending
 ```
+
+An unshield is the same flow with one more output: a commitment whose npk is the public
+address, last in the list, with no ciphertext and no tree position. The contract pays it
+out, less its fee, and the POI proof carries the Railgun txid in place of a blinded note.
 
 The contract never sees amounts, owners or the token of a private transfer. It learns that a
 valid proof spent some unspent notes under a known root.

@@ -7,7 +7,7 @@ through UniFFI. See `scope.md` for the plan and milestones, and
 ## Status
 
 - API: `crates/rg-core` is what bindings sit on: `Client` with a file store, sync,
-  transfers and POI.
+  transfers, unshields and POI.
 - M0: `harness/` generates golden vectors from the TS engine
   (`@railgun-community/engine` 9.6.0) into `vectors/`.
 - M1: `crates/rg-primitives` (Poseidon 1 to 16 inputs, BabyJubJub, field helpers) and
@@ -37,8 +37,9 @@ through UniFFI. See `scope.md` for the plan and milestones, and
   Sepolia contract's 1x2 key accept the Rust proof, and the recipient decrypts the note.
   Submitted on Arbitrum; Anon wallet received it.
 - M5: `crates/rg-poi` (txid trees, blinded commitments, POI circuit inputs, aggregator
-  client). On Arbitrum a Rust proof took a private transfer's outputs to `Valid`, and Anon
-  wallet moved the funds from pending to spendable. Shields and unshields are not covered. See `HANDOFF.md` for the POI artifacts, which are newer
+  client). On Arbitrum Rust proofs took transfers and an unshield to `Valid`, and Anon wallet
+  moved the funds from pending to spendable. POI for your own shields is left to the list
+  provider, which screens them. See `HANDOFF.md` for the POI artifacts, which are newer
   than the engine's.
 
 ## Running the tests
@@ -144,7 +145,7 @@ HARNESS_NODE_MODULES=/path/to/node_modules node harness/check-rust.js /tmp/rust-
 - `rg_wallet` drops a shield note whose note public key is not
   `poseidon(ourMPK, random)`; the engine keeps any shield whose random decrypts. Such a
   note could not be spent.
-- `rg_tx::plan_transfer` spends one note (1xN circuits). Several inputs, unshields,
+- `rg_tx::select_notes` spends from one tree, up to 10 notes. Spending across trees,
   relay adapt params and broadcaster fees are not done yet.
 - `rg_prover::Circuit::prove` checks the witness length against the zkey's variable
   count; ark-circom's matrices count one witness variable too many.

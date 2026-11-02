@@ -5,7 +5,10 @@ use rg_keys::{decode_address, WalletKeys};
 use rg_primitives::Fr;
 use rg_prover::ark_types::{Bn254, Proof};
 use rg_prover::Circuit;
-use rg_tx::{chain_full_network_id, plan_transfer, prepare, transact_calldata, TransferRequest};
+use rg_tx::{
+    chain_full_network_id, plan_transfer, plan_unshield, prepare, transact_calldata,
+    TransferParams, TransferRequest, UnshieldRequest,
+};
 
 use crate::{ChainStore, Client, Error};
 
@@ -17,6 +20,14 @@ pub struct Transfer<'a> {
     pub token: [u8; 20],
     pub value: u128,
     pub memo: Option<&'a str>,
+}
+
+/// Out of the pool to a public address. The contract keeps its fee, so `to`
+/// receives slightly less than `value`.
+pub struct Unshield {
+    pub to: [u8; 20],
+    pub token: [u8; 20],
+    pub value: u128,
 }
 
 /// A call for any funded account to sign and send.
@@ -71,11 +82,47 @@ impl<S: ChainStore> Client<S> {
             chain_id: chain_full_network_id(0, self.network.chain_id),
             min_gas_price: 0,
         };
-        let scan = self.scan(keys);
         let mut rng = rand::rngs::OsRng;
-        let params = plan_transfer(keys, &self.state, &scan, &request, |b| rng.fill_bytes(b))?;
-        let prepared = prepare(keys, &params)?;
-        let shape = format!("{}x{}", params.inputs.len(), params.outputs.len());
+        let params = plan_transfer(keys, &self.state, &self.scan(keys), &request, |b| {
+            rng.fill_bytes(b)
+        })?;
+        self.prove_transaction(keys, &params, artifacts)
+    }
+
+    /// Plans and proves an unshield. `artifacts` is as for `build_transfer`.
+    pub fn build_unshield(
+        &self,
+        keys: &WalletKeys,
+        unshield: &Unshield,
+        artifacts: &Path,
+    ) -> Result<UnsignedTx, Error> {
+        let request = UnshieldRequest {
+            to: unshield.to,
+            token: unshield.token,
+            value: unshield.value,
+            wallet_source: WALLET_SOURCE,
+            chain_id: chain_full_network_id(0, self.network.chain_id),
+            min_gas_price: 0,
+        };
+        let mut rng = rand::rngs::OsRng;
+        let params = plan_unshield(keys, &self.state, &self.scan(keys), &request, |b| {
+            rng.fill_bytes(b)
+        })?;
+        self.prove_transaction(keys, &params, artifacts)
+    }
+
+    fn prove_transaction(
+        &self,
+        keys: &WalletKeys,
+        params: &TransferParams,
+        artifacts: &Path,
+    ) -> Result<UnsignedTx, Error> {
+        let prepared = prepare(keys, params)?;
+        let shape = format!(
+            "{}x{}",
+            prepared.nullifiers.len(),
+            prepared.commitments.len()
+        );
         let (proof, public) = prove(&artifacts.join(shape), &prepared.circuit_inputs)?;
         if public != prepared.public_inputs() {
             return Err(Error::BadProof);

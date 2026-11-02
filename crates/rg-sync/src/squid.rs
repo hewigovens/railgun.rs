@@ -13,7 +13,9 @@ const PAGE: usize = 10_000;
 pub struct SquidTransaction {
     pub transaction_hash: [u8; 32],
     pub nullifiers: Vec<[u8; 32]>,
+    /// With an unshield, its commitment comes last and takes no tree position.
     pub commitments: Vec<[u8; 32]>,
+    pub has_unshield: bool,
     pub bound_params_hash: [u8; 32],
     pub utxo_tree_in: u32,
     pub utxo_tree_out: u32,
@@ -38,6 +40,7 @@ fn transaction(v: &Value) -> Option<SquidTransaction> {
         transaction_hash: word(&v["transactionHash"])?,
         nullifiers: words(&v["nullifiers"])?,
         commitments: words(&v["commitments"])?,
+        has_unshield: v["hasUnshield"].as_bool()?,
         bound_params_hash: word(&v["boundParamsHash"])?,
         utxo_tree_in: number(&v["utxoTreeIn"])? as u32,
         utxo_tree_out: number(&v["utxoTreeOut"])? as u32,
@@ -61,7 +64,7 @@ pub fn fetch_transactions(url: &str) -> Result<Vec<SquidTransaction>, Error> {
     loop {
         let q = format!(
             "{{ transactions(orderBy: id_ASC, limit: {PAGE}, where: {{id_gt: \"{last_id}\"}}) \
-             {{ id transactionHash nullifiers commitments boundParamsHash \
+             {{ id transactionHash nullifiers commitments hasUnshield boundParamsHash \
              utxoTreeIn utxoTreeOut utxoBatchStartPositionOut }} }}"
         );
         let resp = query(&http, url, q)?;
