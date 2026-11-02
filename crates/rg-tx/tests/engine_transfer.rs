@@ -1,6 +1,6 @@
-//! One 1x2 private transfer against the TS engine (harness/m4.js).
+//! One 1x2 private transfer against the TS engine (harness/transfer.js).
 //!
-//! `vectors/m4/transfer.json` is the engine's transfer from the throwaway Sepolia test wallet (index 0 to index 1) spending a synthetic shield appended to the first 200 Sepolia logs, with the engine's randomness pinned. `sepolia-vkey-1x2.json` is the contract's VerifyingKeySet log for the 1x2 circuit.
+//! `vectors/transfer/transfer.json` is the engine's transfer from the throwaway Sepolia test wallet (index 0 to index 1) spending a synthetic shield appended to the first 200 Sepolia logs, with the engine's randomness pinned. `sepolia-vkey-1x2.json` is the contract's VerifyingKeySet log for the 1x2 circuit.
 //!
 //! Tests that need the wallet's keys read `.test-wallet/sepolia-test-mnemonic.txt` (gitignored) and skip without it. Tests that need the circuit artifacts are ignored by default; run them with `RG_ARTIFACTS_DIR=<dir with 1x2/> cargo test -p rg-tx --release -- --ignored`.
 
@@ -27,7 +27,7 @@ fn read_json(rel: &str) -> Value {
 }
 
 fn transfer() -> Value {
-    read_json("vectors/m4/transfer.json")
+    read_json("vectors/transfer/transfer.json")
 }
 
 fn fr(v: &Value) -> Fr {
@@ -56,7 +56,7 @@ fn engine_call(t: &Value) -> abi::transactCall {
 }
 
 fn onchain_vkey() -> rg_prover::ark_types::VerifyingKey<rg_prover::ark_types::Bn254> {
-    let log = RawLog::from_json(&read_json("vectors/m4/sepolia-vkey-1x2.json")).unwrap();
+    let log = RawLog::from_json(&read_json("vectors/transfer/sepolia-vkey-1x2.json")).unwrap();
     let topics = log.topics.iter().map(|t| B256::from(*t));
     let ev = abi::VerifyingKeySet::decode_raw_log(topics, &log.data).unwrap();
     assert_eq!(
@@ -132,10 +132,10 @@ fn snarkjs_proof_verifies_against_onchain_key() {
 
 fn engine_state() -> SyncState {
     let mut logs = RawLog::parse_jsonl(
-        &std::fs::read_to_string(root().join("vectors/m3/sepolia-head-200.jsonl")).unwrap(),
+        &std::fs::read_to_string(root().join("vectors/sepolia/sepolia-head-200.jsonl")).unwrap(),
     )
     .unwrap();
-    logs.push(RawLog::from_json(&read_json("vectors/m4/shield-log.json")).unwrap());
+    logs.push(RawLog::from_json(&read_json("vectors/transfer/shield-log.json")).unwrap());
     let mut state = SyncState::new();
     state.apply_all(&logs).unwrap();
     state
@@ -325,7 +325,7 @@ fn rust_witness_and_proof_match() {
         .calculator()
         .unwrap();
     let witness = calc.calculate(&engine_inputs(&t)).unwrap();
-    let expected = frs(&read_json("vectors/m4/witness.json"));
+    let expected = frs(&read_json("vectors/transfer/witness.json"));
     assert_eq!(witness.len(), expected.len());
     assert!(witness == expected, "witness differs from snarkjs");
 

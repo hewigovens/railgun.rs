@@ -17,7 +17,8 @@ members = [
 [workspace.package]
 edition = "2024"
 rust-version = "1.97.1"
-license = "MIT"
+license = "Apache-2.0"
+repository = "https://github.com/hewigovens/railgun.rs"
 publish = false
 
 [workspace.dependencies]

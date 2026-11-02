@@ -159,7 +159,7 @@ The contract does not enforce any of this; wallets and broadcasters do. Blinded 
 are `poseidon(commitment, npk, global position)`, so the list holds no amounts or addresses.
 
 POI artifacts are versioned apart from the engine, and the live aggregator rejects proofs
-made with older keys. `HANDOFF.md` records the current IPFS root.
+made with older keys. `docs/development.md` records the current IPFS root.
 
 ## Key material
 

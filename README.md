@@ -1,134 +1,111 @@
-# railgun-rust-core
+# railgun.rs
 
-A Rust core for a private Railgun wallet, meant to be exposed to Swift and Kotlin
-through UniFFI. See `scope.md` for the plan and milestones, and
-`docs/architecture.md` for crates and flows.
+A Rust implementation of a [Railgun](https://railgun.org) wallet: keys and 0zk addresses,
+note encryption, chain sync and scanning, Groth16 proofs for private transfers and
+unshields, Private Proof of Innocence (POI), and signing and sending. Swift and Kotlin
+bindings come from UniFFI.
 
-## Status
+It is a library first. It replaces the TS engine and wallet SDK for apps that would
+rather not ship Node.js, and its bytes match theirs. There is no app here; the `wallet`
+example is a command line over the API.
 
-- Bindings: `crates/rg-uniffi` exposes the API to Swift and Kotlin. See `HANDOFF.md`.
-- API: `crates/rg-core` is what bindings sit on: `Client` with a file store, sync,
-  transfers, unshields and POI.
-- M0: `harness/` generates golden vectors from the TS engine
-  (`@railgun-community/engine` 9.6.0) into `vectors/`.
-- M1: `crates/rg-primitives` (Poseidon 1 to 16 inputs, BabyJubJub, field helpers) and
-  `crates/rg-keys` (Railgun's BIP32 variant, spending, viewing, nullifying and master
-  public keys, 0zk address encode and decode). Both are checked against the vectors and
-  against the vectors in the engine's own tests.
-- M2: `rg-primitives` adds EdDSA Poseidon signing and verification (constant-sequence
-  ladder for secret scalars), Ed25519 ECDH and viewing-key blinding, and AES-256-GCM
-  (16-byte IV) and CTR. `crates/rg-notes` has token hashes, note public keys,
-  commitments, nullifiers, memo text, annotation data, V2 transact note ciphertexts
-  (encrypt, decrypt as receiver, decrypt as sender) and shield ciphertexts. The harness
-  pins every IV and random the engine draws, so ciphertexts compare byte for byte.
-- M3: `crates/rg-tree` (depth-16 Poseidon Merkle tree, proofs), `crates/rg-sync`
-  (V2.1 proxy event decoding with `alloy-sol-types`, trees and nullifiers rebuilt from
-  logs, root history, `transact` calldata roots; optional `rpc` feature with a blocking
-  JSON-RPC client) and `crates/rg-wallet` (trial decryption, TXOs, spent status, sent
-  notes, balances). Checked on the full Sepolia history to block 12031295: every root
-  a successful `transact` call used is in the rebuilt history, and the TS engine gets
-  the same root, TXOs, spends and balances for the same wallet.
-- M4 (not yet on chain): `crates/rg-prover` (circom witness from the circuit wasm on
-  wasmi, or wasmtime with the `wasmtime` feature; snarkjs zkey loading and Groth16
-  proving with arkworks; snarkjs JSON for keys and proofs) and `crates/rg-tx` (note
-  selection, recipient and change outputs, bound params and their hash, the spending
-  signature, circuit inputs, `transact` calldata, the contract's verifying key from its
-  `VerifyingKeySet` event). Against the TS engine with randoms pinned: circuit inputs,
-  bound params and calldata are identical, the witness equals snarkjs's, snarkjs and the
-  Sepolia contract's 1x2 key accept the Rust proof, and the recipient decrypts the note.
-  Submitted on Arbitrum; Anon wallet received it.
-- M5: `crates/rg-poi` (txid trees, blinded commitments, POI circuit inputs, aggregator
-  client). On Arbitrum Rust proofs took transfers and an unshield to `Valid`, and Anon wallet
-  moved the funds from pending to spendable. POI for your own shields is left to the list
-  provider, which screens them. See `HANDOFF.md` for the POI artifacts, which are newer
-  than the engine's.
+> **Experimental and unaudited.** It has moved real funds on Arbitrum, but nobody has
+> reviewed it for security. Use small amounts.
 
-## Running the tests
+## What works
 
-```
-just test-rust <crate> [filter]
-just test
-just lint
-```
+- Keys from a BIP39 mnemonic, 0zk addresses, and a separate EVM account that pays gas.
+- Sync from an RPC node, with the Railgun squid seeding pre-2023 leaves on mainnets and
+  every root checked against the contract.
+- Scanning and decryption of your notes, spent status and balances.
+- Private transfers and unshields, with several inputs from one tree, proved in Rust.
+- POI proofs, submitted to the aggregator, so recipients can spend what they receive.
+- Shielding ERC-20 tokens, and EIP-1559 signing and sending.
+- Ethereum, Arbitrum and Sepolia.
 
-`AGENTS.md` has the code conventions. Keep the target directory out of a synced folder;
-it gets large.
+Checked against `@railgun-community/engine` 9.6.0 with its randomness pinned: keys,
+ciphertexts, bound params, circuit inputs, calldata and witnesses match byte for byte.
+The engine also gets the same trees, notes and balances for all of Sepolia's history up
+to block 12031295. On Arbitrum, Rust-built transfers, an unshield and a two-input
+transfer were mined and their POI proofs reached `Valid`. Anon wallet saw the funds as
+spendable.
 
-## Regenerating vectors
+## Crates
 
-```
-cd harness && npm install && npm run vectors
-```
-
-Or, with the engine already installed somewhere else:
-
-```
-HARNESS_NODE_MODULES=/path/to/node_modules node harness/gen-vectors.js vectors
-```
-
-Randomness in the harness is derived from a fixed seed, so a rerun gives the same files.
-A change in `vectors/` after a rerun means the engine's behaviour changed.
-
-## Sepolia sync check (M3)
-
-`data/` is not committed. It holds the proxy's logs as JSONL (one `eth_getLogs` object
-per line; Etherscan's logs API gives the same shape) and successful `transact` calls.
-
-```
-cargo run --release -p rg-sync --example check_roots -- data/sepolia-logs.jsonl data/sepolia-transact-calls.json
-cargo run --release -p rg-wallet --example scan_file -- data/sepolia-logs.jsonl <mnemonic-file> > /tmp/rust-scan.json
-HARNESS_NODE_MODULES=/path/to/node_modules node harness/m3.js data/sepolia-logs.jsonl <mnemonic-file> /tmp/rust-scan.json
-cargo test --release -p rg-wallet -- --ignored   # full-history test, needs data/
-```
-
-`vectors/m3/` holds the first 200 Sepolia logs and the engine's result for them, which
-the default test run checks.
-
-## Proving check (M4)
-
-The circuit artifacts are not committed (no licence on them). `rg_core::Artifacts`
-downloads them at run time and checks their hashes. These checks read a local copy: the
-engine repository's `src/test/test-artifacts-lite` has brotli-compressed 1x2 artifacts
-whose key equals the one the Sepolia contract set at block 10028485; decompress them into
-`<artifacts>/1x2/{circuit.wasm,circuit.zkey,vkey.json}`.
-
-```
-ARTIFACTS_DIR=<artifacts> HARNESS_NODE_MODULES=/path/to/node_modules \
-  node harness/m4.js vectors/m3/sepolia-head-200.jsonl <mnemonic-file> vectors/m4
-RG_ARTIFACTS_DIR=<artifacts> cargo test --release -p rg-tx -- --ignored
-cargo run --release -p rg-prover --features wasmtime,parallel --example prove_1x2 -- <artifacts>/1x2 vectors/m4/transfer.json
-```
-
-`vectors/m4/transfer.json` comes from the throwaway Sepolia test wallet, so the two
-tests that rebuild it from keys read `.test-wallet/sepolia-test-mnemonic.txt` and skip
-when it is missing. The rest run on public data only.
-
-Timings for one 1x2 transfer on this machine (4-core 2.1 GHz Xeon, release):
-
-| step | time |
+| Crate | What it holds |
 | --- | --- |
-| zkey load (6 MB, with curve checks) | 1.15 s |
-| witness, wasmi | 0.36 s |
-| witness, wasmtime | 0.04 to 0.06 s |
-| prove, one thread | 0.60 to 0.76 s |
-| prove, `parallel` (4 threads) | 0.19 s |
-| prove, snarkjs in Node (for comparison) | 1.4 to 1.6 s |
+| `rg-primitives` | Field helpers, Poseidon (1 to 16 inputs), BabyJubJub, EdDSA, Ed25519 ECDH and blinding, AES, BLAKE-512, `PrivateKey` |
+| `rg-keys` | Railgun's BIP32 variant, wallet keys, 0zk addresses, the EVM gas account |
+| `rg-notes` | Token hashes, commitments, nullifiers, note and shield ciphertexts, memos |
+| `rg-tree` | The depth-16 Poseidon Merkle tree |
+| `rg-sync` | Event decoding, trees, nullifiers and root history; RPC and squid clients behind `rpc` |
+| `rg-wallet` | Trial decryption, TXOs, spent status, balances |
+| `rg-prover` | Circom witness from the circuit wasm (wasmi or wasmtime), snarkjs zkeys, Groth16 on arkworks |
+| `rg-tx` | Note selection, outputs, bound params, the spending signature, circuit inputs, calldata, shield, EIP-1559 |
+| `rg-poi` | Txid trees, blinded commitments, POI circuit inputs, the aggregator client |
+| `rg-core` | `Client`: store, sync, scan, transfers, unshields, POI, sending |
+| `rg-uniffi` | Swift and Kotlin bindings over `rg-core` |
 
-## Mainnet and POI
+`docs/architecture.md` has the flows, and `docs/protocol.md` the byte formats.
 
-`rg_core::Client` syncs, scans, builds transfers and proves POI. Its `wallet` example is a
-command line over that, including signing and sending from a gas account and shielding. `HANDOFF.md` has the
-commands and where the POI artifacts come from.
+## Use from Rust
 
-## Rust to TS check
+The crates are not on crates.io yet, so depend on them by git.
 
-Rust-made ciphertexts and signatures, with randoms the engine never saw, decrypted and
-verified by the engine:
+```rust
+use rg_core::{Artifacts, Client, FileStore, Transfer};
+use rg_keys::{EvmKey, WalletKeys};
+use rg_sync::Network;
 
+let keys = WalletKeys::from_mnemonic(&mnemonic, "", 0)?;
+let store = FileStore::open("data/arbitrum")?;
+let mut client = Client::open(Network::ARBITRUM, "https://arb1.arbitrum.io/rpc", store)?;
+client.sync()?;
+let balances = client.scan(&keys).balances();
+
+let transfer = Transfer { recipient: "0zk1...", token: weth, value: 10_000_000_000_000, memo: None };
+let tx = client.build_transfer(&keys, &transfer, &Artifacts::new("data/artifacts"))?;
+let gas = EvmKey::from_mnemonic(&mnemonic, "", 0)?;
+let hash = client.send(&gas, &tx)?;
 ```
-cargo run -p rg-notes --example emit_ciphertexts > /tmp/rust-ciphertexts.json
-HARNESS_NODE_MODULES=/path/to/node_modules node harness/check-rust.js /tmp/rust-ciphertexts.json
+
+The first sync on a mainnet seeds old leaves from the squid. Circuit artifacts download the first time a proof needs them. After a transfer
+is mined, `client.prove_poi` and `client.submit_poi` give it POI.
+
+`crates/rg-core/examples/wallet.rs` covers `sync`, `balance`, `transfer`, `unshield`,
+`shield`, `send` and `poi`:
+
+```sh
+cargo run --release -p rg-core --example wallet -- arbitrum <rpc url> <data dir> <mnemonic file> balance
 ```
+
+## Swift and Kotlin
+
+`just ffi` writes the bindings to `build/bindings`. `just ffi-apple` builds an
+XCFramework for macOS, iOS and the iOS simulator, and `just ffi-android` builds JNI
+libraries. Every call blocks, so call from a background thread. Amounts are decimal
+strings.
+
+The smoke tests in `crates/rg-uniffi/tests` show how to use the bindings, including how
+to pass a mnemonic as bytes and wipe it afterwards.
+
+## Circuit artifacts
+
+Railgun's circuits carry no license, so this repository does not include them. Like
+every Railgun wallet, `rg_core::Artifacts` downloads them from IPFS the first time it
+needs them. It checks each file against the hashes the wallet SDK publishes, and checks
+again on every load.
+
+## Not supported yet
+
+- Spending notes from more than one tree in one transfer.
+- Native ETH: shielding it, or unshielding to it, needs the relay adapt contract.
+- Broadcasters, so for now a public account pays gas and shows on chain.
+- NFTs.
+- Legacy (pre-2023) events, so a wallet with notes from before the squid seed cannot
+  scan them.
+- A view-only wallet.
+- Running inside a real Android app, and timings on real phones.
 
 ## Known differences from the TS engine
 
@@ -146,26 +123,41 @@ HARNESS_NODE_MODULES=/path/to/node_modules node harness/check-rust.js /tmp/rust-
   that when a wallet source is set, not when encoding.
 - `memo::decrypt_annotation` returns none for annotation data under 32 bytes, where the
   engine would return truncated fields.
-
 - `rg_wallet` drops a shield note whose note public key is not
   `poseidon(ourMPK, random)`; the engine keeps any shield whose random decrypts. Such a
   note could not be spent.
-- `rg_tx::select_notes` spends from one tree, up to 10 notes. Spending across trees,
-  relay adapt params and broadcaster fees are not done yet.
+- `rg_tx::select_notes` spends from one tree, up to 10 notes.
 - `rg_prover::Circuit::prove` checks the witness length against the zkey's variable
   count; ark-circom's matrices count one witness variable too many.
-- `rg_sync` decodes V2.1 events only (all Sepolia has). On mainnets, pre-March-2023
-  leaves are seeded by hash from the squid, with the root checked against the contract,
-  so a wallet with notes before the seed cannot be scanned yet.
 
-## Licensing
+## Development
 
-MIT. `crates/rg-primitives/src/poseidon.rs` is a port of codex-storage/rs-poseidon
-(MIT OR Apache-2.0), and `poseidon_constants_opt.json` is vendored from it (circomlib's
-optimized Poseidon parameters). Vectors in `crates/rg-keys/tests/engine_vectors.rs`
-and `crates/rg-notes/tests/engine_vectors.rs` are copied from the Railgun engine's
-tests (MIT), and `crates/rg-core/src/artifact-v2-hashes.json` from the wallet SDK (MIT).
-EdDSA is written from the circomlib scheme; no circomlibjs (GPL-3.0) code
-is ported. BLAKE-512 is written from the SHA-3 submission. `crates/rg-prover/src/zkey.rs` and `qap.rs` are ported from ark-circom
-0.5.0 (MIT OR Apache-2.0, Copyright (c) 2021 Georgios Konstantopoulos); the witness
-calculator follows circom_runtime's calling convention and copies no code from it.
+```sh
+just test          # all workspace tests
+just lint          # rustfmt, clippy, SwiftFormat, SwiftLint
+just test-swift    # Swift smoke test
+just test-kotlin   # Kotlin smoke test, needs Gradle
+```
+
+`docs/development.md` covers the test vectors, the TS harness, the checks that need
+circuit artifacts or chain data, live runs, and measurements. `AGENTS.md` has the code
+conventions.
+
+## License
+
+Copyright 2026 hewigovens. Licensed under the Apache License, Version 2.0; see `LICENSE`.
+
+Parts come from other projects and keep their own licenses:
+
+- `crates/rg-primitives/src/poseidon.rs` is a port of codex-storage/rs-poseidon
+  (MIT OR Apache-2.0), and `poseidon_constants_opt.json` is vendored from it
+  (circomlib's optimized Poseidon parameters).
+- `crates/rg-prover/src/zkey.rs` and `qap.rs` are ported from ark-circom 0.5.0
+  (MIT OR Apache-2.0, Copyright (c) 2021 Georgios Konstantopoulos).
+- Vectors in `crates/rg-keys/tests/engine_vectors.rs` and
+  `crates/rg-notes/tests/engine_vectors.rs` come from the Railgun engine's tests (MIT),
+  and `crates/rg-core/src/artifact-v2-hashes.json` from the Railgun wallet SDK (MIT).
+
+EdDSA is written from the circomlib scheme, and no circomlibjs (GPL-3.0) code is ported.
+BLAKE-512 is written from the SHA-3 submission. The witness calculator follows
+circom_runtime's calling convention and copies no code from it.

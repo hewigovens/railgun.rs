@@ -1,4 +1,4 @@
-//! Checks that need no circuit artifacts. The full witness and proof checks against snarkjs are in rg-tx's engine_m4 tests.
+//! Checks that need no circuit artifacts. The full witness and proof checks against snarkjs are in rg-tx's engine_transfer tests.
 
 use rg_prover::witness::signal_hash;
 use rg_prover::{proof_from_json, proof_to_json};
@@ -22,7 +22,7 @@ fn signal_hash_matches_circom_runtime() {
 fn snarkjs_proof_json_round_trips() {
     let path = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../vectors/m4/transfer.json"
+        "/../../vectors/transfer/transfer.json"
     );
     let t: Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
     let theirs = &t["snarkjsProof"];

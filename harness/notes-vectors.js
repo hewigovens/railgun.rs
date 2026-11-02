@@ -1,4 +1,4 @@
-// M2 vectors: EdDSA Poseidon, Ed25519 shared keys and blinding, token hashes,
+// Note and signature vectors: EdDSA Poseidon, Ed25519 shared keys and blinding, token hashes,
 // commitments, nullifiers, V2 transact note ciphertexts and shield ciphertexts.
 // Every random value the engine draws (IVs, note and sender randoms) comes from
 // a queue this file fills, so each vector records the exact inputs it used.
@@ -6,7 +6,7 @@
 const crypto = require('crypto');
 
 module.exports = async (eng, circomlibjs, wallets) => {
-  // A stream separate from M0/M1, so adding vectors here never shifts those.
+  // A stream separate from gen-vectors.js, so adding vectors here never shifts those.
   let counter = 0;
   const SEED = 'railgun-rust-core-vectors-m2-v1';
   const randomBytes = (n) => {

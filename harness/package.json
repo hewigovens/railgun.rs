@@ -1,8 +1,8 @@
 {
-  "name": "railgun-rust-core-harness",
+  "name": "railgun-rs-harness",
   "private": true,
   "description": "Generates golden test vectors from the Railgun TS engine for the Rust core.",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "scripts": {
     "vectors": "node gen-vectors.js ../vectors"
   },

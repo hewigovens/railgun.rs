@@ -4,6 +4,7 @@ version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+repository.workspace = true
 publish.workspace = true
 description = "Railgun's Poseidon Merkle tree: depth 16, one tree per 65,536 leaves"
 

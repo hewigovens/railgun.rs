@@ -1,7 +1,7 @@
-// M3 check: the TS engine rebuilds the UTXO tree from the same proxy logs and
+// Scan check: the TS engine rebuilds the UTXO tree from the same proxy logs and
 // scans one wallet, and the result is diffed against the Rust scan_file output.
 //
-// node harness/m3.js <logs.jsonl> <mnemonic-file> [rust-scan.json]
+// node harness/scan.js <logs.jsonl> <mnemonic-file> [rust-scan.json]
 // Without the Rust file it prints the engine's result as JSON (a vector).
 // HARNESS_NODE_MODULES points at a node_modules with the engine and memdown.
 

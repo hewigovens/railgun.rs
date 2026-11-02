@@ -1,4 +1,4 @@
-//! M2 primitives against harness vectors and the engine's own keys-utils test.
+//! EdDSA and Ed25519 against harness vectors and the engine's own keys-utils test.
 
 use ark_ff::PrimeField;
 use rg_primitives::Fr;

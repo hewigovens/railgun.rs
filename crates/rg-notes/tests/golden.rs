@@ -1,4 +1,4 @@
-//! rg-notes against vectors produced by harness/m2.js from the TS engine.
+//! rg-notes against vectors produced by harness/notes-vectors.js from the TS engine.
 
 use rg_notes::memo::{decode_text, decrypt_annotation, encode_text, encrypt_annotation_v2};
 use rg_notes::note::{commitment, note_public_key, nullifier};

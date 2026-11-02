@@ -1,4 +1,4 @@
-//! Circuit artifacts: downloaded when first needed and checked by hash every time they load. They are not redistributed here (see scope.md), only their hashes, from the wallet SDK's `artifact-v2-hashes.json` (MIT).
+//! Circuit artifacts: downloaded when first needed and checked by hash every time they load. The circuits carry no license, so they are not redistributed here, only their hashes, from the wallet SDK's `artifact-v2-hashes.json` (MIT).
 
 use std::fs;
 use std::io::Read;
