@@ -84,7 +84,7 @@ impl<S: ChainStore> Client<S> {
                 rand::rngs::OsRng.fill_bytes(b)
             })
         })?;
-        self.prove_transaction(keys, &params, artifacts)
+        self.prove_transactions(keys, &params, artifacts)
     }
 
     /// Plans and proves an unshield.
@@ -108,7 +108,7 @@ impl<S: ChainStore> Client<S> {
                 rand::rngs::OsRng.fill_bytes(b)
             })
         })?;
-        self.prove_transaction(keys, &params, artifacts)
+        self.prove_transactions(keys, &params, artifacts)
     }
 
     /// Plans against spendable notes only. When notes still waiting for POI would have covered `value`, says so rather than reporting a shortfall.
@@ -117,8 +117,8 @@ impl<S: ChainStore> Client<S> {
         keys: &WalletKeys,
         token_hash: &[u8; 32],
         value: u128,
-        plan: impl FnOnce(&ScanResult) -> Result<TransferParams<'a>, rg_tx::Error>,
-    ) -> Result<TransferParams<'a>, Error> {
+        plan: impl FnOnce(&ScanResult) -> Result<Vec<TransferParams<'a>>, rg_tx::Error>,
+    ) -> Result<Vec<TransferParams<'a>>, Error> {
         let spendable = self.spendable_scan(keys)?;
         match plan(&spendable) {
             Err(rg_tx::Error::InsufficientNote(_)) => {
@@ -133,25 +133,32 @@ impl<S: ChainStore> Client<S> {
         }
     }
 
-    fn prove_transaction(
+    /// Proves each planned transaction, and puts them all in one `transact` call.
+    fn prove_transactions(
         &self,
         keys: &WalletKeys,
-        params: &TransferParams,
+        planned: &[TransferParams],
         artifacts: &Artifacts,
     ) -> Result<UnsignedTx, Error> {
-        let prepared = params.prepare(keys)?;
-        let circuit = crate::Circuit::Transact {
-            inputs: prepared.nullifiers.len(),
-            outputs: prepared.commitments.len(),
-        };
-        let (proof, public) = prove(artifacts, circuit, &prepared.circuit_inputs)?;
-        if public != prepared.public_inputs() {
-            return Err(Error::BadProof);
-        }
+        let transactions = planned
+            .iter()
+            .map(|params| {
+                let prepared = params.prepare(keys)?;
+                let circuit = crate::Circuit::Transact {
+                    inputs: prepared.nullifiers.len(),
+                    outputs: prepared.commitments.len(),
+                };
+                let (proof, public) = prove(artifacts, circuit, &prepared.circuit_inputs)?;
+                if public != prepared.public_inputs() {
+                    return Err(Error::BadProof);
+                }
+                Ok(prepared.transaction(&proof))
+            })
+            .collect::<Result<Vec<_>, Error>>()?;
         Ok(UnsignedTx {
             chain_id: self.network.chain_id,
             to: self.network.proxy.to_string(),
-            data: transact_calldata(vec![prepared.transaction(&proof)]),
+            data: transact_calldata(transactions),
         })
     }
 

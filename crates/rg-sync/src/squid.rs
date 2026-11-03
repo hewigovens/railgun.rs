@@ -85,8 +85,8 @@ pub fn fetch_transactions_after(url: &str, after: &str) -> Result<Vec<SquidTrans
     }
 }
 
-/// The Railgun transaction in one EVM transaction, if the squid has it. A batch holds several; this core only makes single ones.
-pub fn fetch_transaction(url: &str, hash: &[u8; 32]) -> Result<Option<SquidTransaction>, Error> {
+/// The Railgun transactions in one EVM transaction, as many as its `transact` call carried, if the squid has them.
+pub fn fetch_transactions(url: &str, hash: &[u8; 32]) -> Result<Vec<SquidTransaction>, Error> {
     let http = reqwest::blocking::Client::new();
     let q = format!(
         "{{ transactions(where: {{transactionHash_eq: \"0x{}\"}}) {{ {TRANSACTION_FIELDS} }} }}",
@@ -96,9 +96,9 @@ pub fn fetch_transaction(url: &str, hash: &[u8; 32]) -> Result<Option<SquidTrans
     let page = resp["data"]["transactions"]
         .as_array()
         .ok_or_else(|| Error::Rpc(format!("squid: {resp}")))?;
-    page.first()
+    page.iter()
         .map(|v| transaction(v).ok_or_else(|| Error::Rpc(format!("squid tx: {v}"))))
-        .transpose()
+        .collect()
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

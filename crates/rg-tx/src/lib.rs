@@ -1,6 +1,6 @@
 //! Railgun private transfers (V2): the engine's `transaction/transaction.ts`, `transaction-batch.ts`, `bound-params.ts` and `prover.ts` formatting.
 //!
-//! [`plan_transfer`] picks a note and builds the outputs (recipient plus change), [`TransferParams::prepare`] makes bound params, nullifiers, commitments, the spending signature and the circuit inputs, and [`Prepared::transaction`] wraps a proof into the contract's `Transaction` for [`transact_calldata`]. Proving lives in `rg-prover`; this crate never touches the network.
+//! [`plan_transfer`] picks notes and builds the outputs (recipient plus change), one transaction per group of notes from one tree, [`TransferParams::prepare`] makes bound params, nullifiers, commitments, the spending signature and the circuit inputs, and [`Prepared::transaction`] wraps a proof into the contract's `Transaction` for [`transact_calldata`]. Proving lives in `rg-prover`; this crate never touches the network.
 
 mod contract;
 mod eip1559;

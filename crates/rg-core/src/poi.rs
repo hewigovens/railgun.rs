@@ -8,9 +8,9 @@ use rg_poi::{
     global_tree_position, railgun_txid, txid_leaf,
 };
 use rg_primitives::{Fr, field};
-use rg_sync::squid::{SquidTransaction, fetch_transaction, fetch_transactions_after};
+use rg_sync::squid::{SquidTransaction, fetch_transactions, fetch_transactions_after};
 use rg_tree::TREE_CAPACITY;
-use rg_wallet::Txo;
+use rg_wallet::{ScanResult, Txo};
 use serde_json::{Value, json};
 
 use crate::transfer::prove;
@@ -19,12 +19,24 @@ use crate::{Artifacts, ChainStore, Circuit, Client, Error};
 /// Blinded commitment to the aggregator's word for it.
 pub type PoiStatus = BTreeMap<String, String>;
 
-/// A POI proof ready to submit. `data` is `TransactProofData`.
+/// POI proofs for one EVM transaction, one per Railgun transaction in it, ready to submit. Each `data` is a `TransactProofData`.
 #[derive(Clone, Debug)]
 pub struct PoiProof {
     /// What to ask the aggregator about: blinded commitment and its kind.
     pub blinded: Vec<(String, &'static str)>,
-    pub data: Value,
+    pub data: Vec<Value>,
+}
+
+/// Every txid leaf, and the tree over them.
+struct Txids {
+    leaves: Vec<Fr>,
+    trees: TxidTrees,
+}
+
+impl Txids {
+    fn latest(&self) -> u64 {
+        self.leaves.len() as u64 - 1
+    }
 }
 
 fn fr(b: &[u8]) -> Fr {
@@ -106,20 +118,19 @@ impl<S: ChainStore> Client<S> {
             .network
             .squid
             .ok_or(Error::NoSquid(self.network.name))?;
-        let tx = fetch_transaction(url, tx_hash)?.ok_or_else(|| unprovable("not indexed yet"))?;
+        let txs = fetch_transactions(url, tx_hash)?;
+        if txs.is_empty() {
+            return Err(unprovable("not indexed yet"));
+        }
         let leaves = self.txid_leaves(url)?;
-        let tx_leaf = leaf(&tx);
-        let index = leaves
-            .iter()
-            .position(|l| l == &tx_leaf)
-            .ok_or_else(|| unprovable("not in the txid tree yet"))? as u64;
-        let latest = leaves.len() as u64 - 1;
         let mut trees = TxidTrees::default();
         trees.extend(&leaves)?;
+        let txids = Txids { leaves, trees };
 
         let capacity = TREE_CAPACITY as u64;
+        let latest = txids.latest();
         let (tree, position) = ((latest / capacity) as u32, (latest % capacity) as u32);
-        let root = trees.root(tree as usize).ok_or(Error::BadProof)?;
+        let root = txids.trees.root(tree as usize).ok_or(Error::BadProof)?;
         if !self
             .node()
             .validate_txid_merkleroot(tree, position, &root)?
@@ -130,6 +141,37 @@ impl<S: ChainStore> Client<S> {
         }
 
         let scan = self.scan(keys);
+        let mut proof = PoiProof {
+            blinded: Vec::new(),
+            data: Vec::new(),
+        };
+        for tx in &txs {
+            let (blinded, data) =
+                self.prove_railgun_transaction(keys, &scan, tx, &txids, artifacts, size)?;
+            proof.blinded.extend(blinded);
+            proof.data.push(data);
+        }
+        Ok(proof)
+    }
+
+    /// The POI proof for one Railgun transaction: its blinded outputs and its `TransactProofData`.
+    fn prove_railgun_transaction(
+        &self,
+        keys: &WalletKeys,
+        scan: &ScanResult,
+        tx: &SquidTransaction,
+        txids: &Txids,
+        artifacts: &Artifacts,
+        size: Option<usize>,
+    ) -> Result<(Vec<(String, &'static str)>, Value), Error> {
+        let unprovable = |why| Error::NotProvable(hex::encode(tx.transaction_hash), why);
+        let tx_leaf = leaf(tx);
+        let index = txids
+            .leaves
+            .iter()
+            .position(|l| l == &tx_leaf)
+            .ok_or_else(|| unprovable("not in the txid tree yet"))? as u64;
+
         let spent = scan
             .txos_for_nullifiers(tx.utxo_tree_in, &tx.nullifiers)
             .ok_or_else(|| unprovable("a spent note is not ours"))?;
@@ -172,7 +214,7 @@ impl<S: ChainStore> Client<S> {
             )
         });
         let inputs = ProofInputs {
-            txid_proof: trees.proof(index)?,
+            txid_proof: txids.trees.proof(index)?,
             bound_params_hash: fr(&tx.bound_params_hash),
             nullifiers: frs(&tx.nullifiers),
             commitments_out: frs(&tx.commitments),
@@ -211,7 +253,7 @@ impl<S: ChainStore> Client<S> {
             "snarkProof": {"pi_a": two(&p["pi_a"]), "pi_b": two(&p["pi_b"]), "pi_c": two(&p["pi_c"])},
             "poiMerkleroots": inputs.list_proofs.iter().map(|l| hex32(&l.root)).collect::<Vec<_>>(),
             "txidMerkleroot": hex32(&inputs.txid_proof.root),
-            "txidMerklerootIndex": latest,
+            "txidMerklerootIndex": txids.latest(),
             "blindedCommitmentsOut": blinded_out,
             "railgunTxidIfHasUnshield": unshield.as_deref().unwrap_or("0x00"),
         });
@@ -220,13 +262,16 @@ impl<S: ChainStore> Client<S> {
             .map(|b| (b, "Transact"))
             .chain(unshield.map(|b| (b, "Unshield")))
             .collect();
-        Ok(PoiProof { blinded, data })
+        Ok((blinded, data))
     }
 
+    /// Submits each Railgun transaction's proof.
     pub fn submit_poi(&self, proof: &PoiProof) -> Result<(), Error> {
-        Ok(self
-            .node()
-            .submit_transact_proof(REQUIRED_LIST, proof.data.clone())?)
+        for data in &proof.data {
+            self.node()
+                .submit_transact_proof(REQUIRED_LIST, data.clone())?;
+        }
+        Ok(())
     }
 
     pub fn poi_status(&self, proof: &PoiProof) -> Result<PoiStatus, Error> {

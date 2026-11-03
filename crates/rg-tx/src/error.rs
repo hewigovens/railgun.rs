@@ -1,12 +1,10 @@
-use crate::MAX_INPUTS;
-
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("note: {0}")]
     Note(#[from] rg_notes::Error),
     #[error("tree: {0:?}")]
     Tree(rg_tree::Error),
-    #[error("no one tree holds {0} of this token in at most {MAX_INPUTS} unspent notes")]
+    #[error("unspent notes do not cover {0} of this token")]
     InsufficientNote(u128),
     #[error("value must be above zero")]
     ZeroValue,
