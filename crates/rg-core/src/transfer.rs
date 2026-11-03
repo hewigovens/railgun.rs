@@ -1,13 +1,13 @@
 use rand::RngCore;
-use rg_keys::{WalletKeys, decode_address};
+use rg_keys::{AddressData, WalletKeys, decode_address};
 use rg_primitives::Fr;
 use rg_prover::Circuit;
 use rg_prover::ark_types::{Bn254, Proof};
 use rg_sync::abi;
 use rg_tx::{
-    AdaptId, TransferParams, TransferRequest, UnshieldRequest, chain_full_network_id,
-    plan_transfer, plan_unshield, relay_adapt_params, relay_calldata, transact_calldata,
-    unshield_base_token_action,
+    AdaptId, BroadcasterFee, TransferParams, TransferRequest, UnshieldRequest,
+    chain_full_network_id, plan_transfer, plan_unshield, relay_adapt_params, relay_calldata,
+    transact_calldata, unshield_base_token_action,
 };
 use rg_wallet::ScanResult;
 
@@ -71,7 +71,7 @@ pub(crate) fn prove(
 }
 
 /// Proves each planned transaction for the contract.
-fn prove_all(
+pub(crate) fn prove_all(
     keys: &WalletKeys,
     planned: &[TransferParams],
     artifacts: &Artifacts,
@@ -102,22 +102,35 @@ impl<S: ChainStore> Client<S> {
         artifacts: &Artifacts,
     ) -> Result<UnsignedTx, Error> {
         let recipient = decode_address(transfer.recipient)?;
+        let params = self.plan_transfer(keys, transfer, &recipient, None, 0)?;
+        self.transact(keys, &params, artifacts)
+    }
+
+    pub(crate) fn plan_transfer<'a>(
+        &self,
+        keys: &WalletKeys,
+        transfer: &Transfer<'a>,
+        recipient: &'a AddressData,
+        broadcaster_fee: Option<BroadcasterFee>,
+        min_gas_price: u128,
+    ) -> Result<Vec<TransferParams<'a>>, Error> {
+        let fee = broadcaster_fee.as_ref().map_or(0, |f| f.value);
         let request = TransferRequest {
-            recipient: &recipient,
+            recipient,
             token_hash: rg_notes::TokenData::erc20(transfer.token).hash(),
             value: transfer.value,
             memo_text: transfer.memo,
             show_sender_to_recipient: false,
             wallet_source: WALLET_SOURCE,
             chain_id: chain_full_network_id(0, self.network.chain_id),
-            min_gas_price: 0,
+            min_gas_price,
+            broadcaster_fee,
         };
-        let params = self.plan(keys, &request.token_hash, request.value, |scan| {
+        self.plan(keys, &request.token_hash, request.value + fee, |scan| {
             plan_transfer(keys, &self.state, scan, &request, |b| {
                 rand::rngs::OsRng.fill_bytes(b)
             })
-        })?;
-        self.transact(keys, &params, artifacts)
+        })
     }
 
     /// Plans and proves an unshield.
@@ -127,7 +140,7 @@ impl<S: ChainStore> Client<S> {
         unshield: &Unshield,
         artifacts: &Artifacts,
     ) -> Result<UnsignedTx, Error> {
-        let params = self.plan_unshield(keys, unshield)?;
+        let params = self.plan_unshield(keys, unshield, None, 0)?;
         self.transact(keys, &params, artifacts)
     }
 
@@ -144,7 +157,7 @@ impl<S: ChainStore> Client<S> {
             token: address(self.network.wrapped_token)?,
             value: unshield.value,
         };
-        let mut params = self.plan_unshield(keys, &to_relay_adapt)?;
+        let mut params = self.plan_unshield(keys, &to_relay_adapt, None, 0)?;
         let mut random = [0u8; 31];
         rand::rngs::OsRng.fill_bytes(&mut random);
         let action = unshield_base_token_action(relay_adapt, unshield.to, random);
@@ -167,21 +180,25 @@ impl<S: ChainStore> Client<S> {
         })
     }
 
-    fn plan_unshield(
+    pub(crate) fn plan_unshield(
         &self,
         keys: &WalletKeys,
         unshield: &Unshield,
+        broadcaster_fee: Option<BroadcasterFee>,
+        min_gas_price: u128,
     ) -> Result<Vec<TransferParams<'static>>, Error> {
+        let fee = broadcaster_fee.as_ref().map_or(0, |f| f.value);
         let request = UnshieldRequest {
             to: unshield.to,
             token: unshield.token,
             value: unshield.value,
             wallet_source: WALLET_SOURCE,
             chain_id: chain_full_network_id(0, self.network.chain_id),
-            min_gas_price: 0,
+            min_gas_price,
+            broadcaster_fee,
         };
         let token_hash = rg_notes::TokenData::erc20(unshield.token).hash();
-        self.plan(keys, &token_hash, unshield.value, |scan| {
+        self.plan(keys, &token_hash, unshield.value + fee, |scan| {
             plan_unshield(keys, &self.state, scan, &request, |b| {
                 rand::rngs::OsRng.fill_bytes(b)
             })

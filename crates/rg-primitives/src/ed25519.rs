@@ -32,6 +32,17 @@ pub fn shared_key(private_key: &[u8; 32], public_key: &[u8; 32]) -> Option<[u8; 
     Some(Sha256::digest(shared.as_bytes()).into())
 }
 
+/// noble-ed25519's `getSharedSecret`, which keys broadcaster messages: X25519 of the clamped sha512(prv)[0..32] with `public_key` mapped to Montgomery form. None when `public_key` is not a curve point or the result is zero.
+pub fn x25519_shared_secret(private_key: &[u8; 32], public_key: &[u8; 32]) -> Option<[u8; 32]> {
+    let point = CompressedEdwardsY(*public_key).decompress()?;
+    let mut h = Sha512::digest(private_key);
+    let mut head = Zeroizing::new([0u8; 32]);
+    head.copy_from_slice(&h[..32]);
+    h.as_mut_slice().zeroize();
+    let shared = point.mul_clamped(*head).to_montgomery().to_bytes();
+    (shared != [0; 32]).then_some(shared)
+}
+
 /// `getBlindingScalar`: the note random (16 bytes) and sender random (15 bytes) XORed as big-endian integers, written as 32 bytes, then sha512 of that read big-endian mod l.
 pub fn blinding_scalar(random: &[u8; 16], sender_random: &[u8; 15]) -> Scalar {
     let mut seed = [0u8; 32];

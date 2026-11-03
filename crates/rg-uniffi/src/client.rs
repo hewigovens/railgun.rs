@@ -8,8 +8,8 @@ use rg_keys::EvmAddress;
 use rg_sync::Network;
 
 use crate::{
-    EvmAccount, FeeQuote, HistoryItem, PoiSubmission, RailgunError, SyncReport, TokenBalance,
-    UnsignedTx, Wallet,
+    BroadcastTransaction, BroadcasterOffer, EvmAccount, FeeQuote, HistoryItem, PoiSubmission,
+    RailgunBroadcasters, RailgunError, SyncReport, TokenBalance, UnsignedTx, Wallet,
 };
 
 fn hash(value: &str) -> Result<[u8; 32], RailgunError> {
@@ -210,6 +210,64 @@ impl RailgunClient {
     /// None until the transaction is mined.
     pub fn receipt(&self, tx_hash: String) -> Result<Option<Receipt>, RailgunError> {
         Ok(self.client().receipt(&hash(&tx_hash)?)?)
+    }
+
+    /// Proves a transfer for `offer`'s broadcaster to submit, which pays gas so no public account shows. Its fee comes from the private balance, in the same token.
+    pub fn build_broadcast_transfer(
+        &self,
+        wallet: &Wallet,
+        recipient: String,
+        token: String,
+        value: String,
+        memo: Option<String>,
+        offer: &BroadcasterOffer,
+    ) -> Result<Arc<BroadcastTransaction>, RailgunError> {
+        let transfer = Transfer {
+            recipient: &recipient,
+            token: address(&token)?,
+            value: amount(&value)?,
+            memo: memo.as_deref(),
+        };
+        let tx = self.client().build_broadcast_transfer(
+            wallet.spending()?,
+            &transfer,
+            &offer.offer,
+            &self.artifacts,
+        )?;
+        Ok(Arc::new(BroadcastTransaction { tx }))
+    }
+
+    /// Proves an unshield for `offer`'s broadcaster to submit. Its fee comes from the private balance, in the same token.
+    pub fn build_broadcast_unshield(
+        &self,
+        wallet: &Wallet,
+        to: String,
+        token: String,
+        value: String,
+        offer: &BroadcasterOffer,
+    ) -> Result<Arc<BroadcastTransaction>, RailgunError> {
+        let unshield = Unshield {
+            to: address(&to)?,
+            token: address(&token)?,
+            value: amount(&value)?,
+        };
+        let tx = self.client().build_broadcast_unshield(
+            wallet.spending()?,
+            &unshield,
+            &offer.offer,
+            &self.artifacts,
+        )?;
+        Ok(Arc::new(BroadcastTransaction { tx }))
+    }
+
+    /// Hands the batch to its broadcaster and waits up to two minutes for the hash of the transaction it sent. Once it is mined, prove and submit POI as for any send.
+    pub fn broadcast(
+        &self,
+        broadcasters: &RailgunBroadcasters,
+        tx: &BroadcastTransaction,
+    ) -> Result<String, RailgunError> {
+        let hash = self.client().broadcast(&mut broadcasters.lock(), &tx.tx)?;
+        Ok(format!("0x{}", hex::encode(hash)))
     }
 
     /// Proves POI for a sent transaction. Sync past it first.

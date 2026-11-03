@@ -1,6 +1,7 @@
 package dev.hewig.railgun.smoke
 
 import dev.hewig.railgun.EvmAccount
+import dev.hewig.railgun.RailgunBroadcasters
 import dev.hewig.railgun.RailgunClient
 import dev.hewig.railgun.RailgunException
 import dev.hewig.railgun.UnsignedTx
@@ -39,6 +40,10 @@ class LiveSmoke private constructor(
         println("transfer: ${transaction.data.size} bytes on chain ${transaction.chainId}")
         val fee = client.quoteFee(environment.getValue("RG_FROM"), transaction)
         println("fee: gas limit ${fee.gasLimit()}, expected ${fee.expectedCost()} wei, at most ${fee.maxCost()} wei")
+
+        val offer = RailgunBroadcasters.connect("arbitrum").bestOffer(token)
+        Check.that(offer != null, "a broadcaster takes the token")
+        println("broadcaster: ${offer?.railgunAddress()} at ${offer?.feePerUnitGas(token)} per unit gas")
 
         environment["RG_SEND_KEY_FILE"]?.let { send(client, wallet, transaction, it) }
         println("live checks passed")

@@ -1,5 +1,8 @@
 uniffi::setup_scaffolding!();
 
+mod broadcast_transaction;
+mod broadcaster_offer;
+mod broadcasters;
 mod client;
 mod error;
 mod evm_account;
@@ -9,6 +12,9 @@ mod types;
 mod validation;
 mod wallet;
 
+pub use broadcast_transaction::BroadcastTransaction;
+pub use broadcaster_offer::BroadcasterOffer;
+pub use broadcasters::RailgunBroadcasters;
 pub use client::RailgunClient;
 pub use error::RailgunError;
 pub use evm_account::EvmAccount;

@@ -4,9 +4,12 @@ use rg_tree::{TREE_CAPACITY, zero_value};
 /// The txid hash pads to 13 no matter which POI circuit proves it.
 const TXID_MAX_ITEMS: usize = 13;
 
-pub fn global_tree_position(tree: u32, index: u32) -> u64 {
+pub const fn global_tree_position(tree: u32, index: u32) -> u64 {
     tree as u64 * TREE_CAPACITY as u64 + index as u64
 }
+
+/// Where a pre-transaction POI places outputs that are in no tree yet (`getGlobalTreePositionPreTransactionPOIProof`).
+pub const PRE_TRANSACTION_POSITION: u64 = global_tree_position(199_999, 199_999);
 
 pub fn blinded_commitment(commitment: &Fr, npk: &Fr, global_position: u64) -> Fr {
     poseidon::hash(&[*commitment, *npk, Fr::from(global_position)]).expect("arity 3")

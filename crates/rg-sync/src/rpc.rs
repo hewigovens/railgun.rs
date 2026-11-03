@@ -187,6 +187,12 @@ impl RpcClient {
         quantity(&v["baseFeePerGas"], "base fee")
     }
 
+    /// The legacy gas price, which broadcasters are offered where batches set a minimum.
+    pub fn gas_price(&self) -> Result<u128, Error> {
+        let v = self.call("eth_gasPrice", json!([]))?;
+        quantity(&v, "gas price")
+    }
+
     pub fn priority_fee(&self) -> Result<u128, Error> {
         let v = self.call("eth_maxPriorityFeePerGas", json!([]))?;
         quantity(&v, "priority fee")

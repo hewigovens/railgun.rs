@@ -16,6 +16,7 @@ flowchart BT
     prover["rg-prover<br/>circom witness, zkey,<br/>Groth16 on arkworks"]
     tx["rg-tx<br/>transfer plan, bound params,<br/>signature, calldata, shield"]
     poi["rg-poi<br/>txid trees, blinded commitments,<br/>POI inputs, aggregator client"]
+    broadcaster["rg-broadcaster<br/>fee offers, sealed requests,<br/>Waku light client"]
 
     keys --> primitives
     notes --> primitives
@@ -36,18 +37,21 @@ flowchart BT
     tx --> primitives
     poi --> tree
     poi --> primitives
+    broadcaster --> keys
+    broadcaster --> primitives
     core["rg-core<br/>Client: store, sync, scan,<br/>transfers, unshields, POI"]
     core --> tx
     core --> poi
     core --> wallet
     core --> sync
     core --> prover
+    core --> broadcaster
     uniffi["rg-uniffi<br/>Swift and Kotlin bindings"]
     uniffi --> core
 ```
 
 `rg-poi` stays independent of the wallet and prover: it builds circuit inputs, and `rg-core`
-joins them. `rg-prover` knows nothing about Railgun
+joins them. `rg-broadcaster` knows message formats and transport, not transactions. `rg-prover` knows nothing about Railgun
 and takes named signals, which is why both the transfer and POI circuits run on it.
 
 ## External systems
@@ -61,6 +65,8 @@ flowchart LR
     node["POI aggregator<br/>ppoi.fdi.network"]
     ipfs["IPFS<br/>circuit artifacts"]
     eoa["Funded EOA or wallet<br/>signs and pays gas"]
+    waku["Waku fleet<br/>store and light push"]
+    broadcaster["Broadcaster<br/>pays gas"]
 
     rpc --> core
     squid --> core
@@ -68,14 +74,17 @@ flowchart LR
     core <--> node
     core -->|calldata| eoa
     eoa -->|transact| proxy
+    core <-->|offers, sealed batch| waku
+    waku <--> broadcaster
+    broadcaster -->|transact| proxy
     proxy -->|events| rpc
 ```
 
 Artifacts are downloaded when a circuit is first needed and hash-checked on every load.
 `Client::send` signs an EIP-1559 transaction with an `EvmKey` and sends it. That account pays
 gas and is public: it is derived on the standard path `m/44'/60'/0'/0/i` or loaded from a key,
-and never from Railgun's spending or viewing keys. A broadcaster would hide it; there is none
-yet. `UnsignedTx` stays available for any other wallet to send.
+and never from Railgun's spending or viewing keys. A broadcaster hides it, below.
+`UnsignedTx` stays available for any other wallet to send.
 
 ## Sync and scan
 
@@ -140,6 +149,51 @@ to RelayAdapt, and the bound params commit to RelayAdapt and to a hash of the nu
 and the follow-up calls, `unwrapBase` and a transfer of the ETH to the recipient. The
 nullifiers are known before proving, so no dummy proof is needed to make that hash.
 
+## A broadcast transfer
+
+A broadcaster sends the batch from its own account, so no account of the user's shows on
+chain, and takes its fee as a private note.
+
+```mermaid
+sequenceDiagram
+    participant C as rg-core
+    participant W as Waku store and light push
+    participant B as Broadcaster
+    participant N as Node RPC
+    participant P as Proxy contract
+
+    B->>W: signed fee offers, every few seconds
+    C->>W: offers from the last minute
+    C->>C: verify signatures, pick the cheapest live one
+    C->>N: estimate gas with empty proofs, from 0x…dEaD
+    C->>C: fee note first, re-plan until the circuits settle
+    C->>C: prove the batch and a pre-transaction POI per transaction
+    C->>W: batch, encrypted to the broadcaster's viewing key
+    W->>B: request
+    B->>B: check fee note and POIs
+    B->>P: transact
+    B->>W: hash, encrypted under the same key
+    C->>W: poll for the answer
+```
+
+The fee is the offer's per-gas rate times the gas limit and price, over 10^18, the way the
+SDK prices it. The request names that price as `minGasPrice`, and the broadcaster sends a
+type-1 transaction at it, after checking it is not far below the going rate. Gas is estimated before proving because the contract skips proof checks
+for `0x000000000000000000000000000000000000dEaD`. On Ethereum and Sepolia the batch also
+commits to the gas price it was priced at, which the contract holds the broadcaster to;
+on Arbitrum it does not, as `tx.gasprice` there is not the price offered.
+
+A pre-transaction POI is the usual POI proof made before the transaction exists: its txid
+leaf sits first in a stand-in tree of zeros, and its outputs at the fixed position
+199999 × 65536 + 199999. The broadcaster checks it before paying gas. Its positions are
+stand-ins, so once the transaction is mined the sender proves and submits POI as for any
+other send.
+
+`Waku` is a light client. It never joins the relay mesh. It reads offers and answers
+with store queries, and hands requests to a node with light push. It finds nodes through
+the fleet's ENR tree in DNS, checked against the tree's pinned key, falling back to the
+nodes it shipped with.
+
 The contract never sees amounts, owners or the token of a private transfer. It learns that a
 valid proof spent some unspent notes under a known root.
 
@@ -188,6 +242,7 @@ The core never stores a key. `FileStore` holds chain data only, and a shell keep
 | `ViewOnlyKeys` and the shareable viewing key | The viewing key, nullifying key and public keys, wiped on drop. `WalletKeys` holds one and derefs to it, so scanning, balances and history take either. The shareable key reveals every note and transaction, so it crosses as bytes and is returned as `Zeroizing`. |
 | Seed, BIP32 nodes, BIP39 entropy and words | Wiped on drop. |
 | `EvmKey`, the gas account | k256 `SigningKey`, wiped on drop, `Debug` shows only the address. |
+| Broadcaster request keys | The one-time key and the key shared with the broadcaster, wiped on drop. The shared key lives as long as the `SealedRequest`, to read the answer. |
 | EdDSA and Ed25519 working values, including the signing nonce | Wiped when the call returns. |
 | Mnemonic entering the core | `&[u8]` borrows the shell's own `Data` or direct `ByteBuffer`, with no UniFFI copy. The shell wipes that buffer after the call. |
 

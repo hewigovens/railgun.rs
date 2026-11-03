@@ -1,5 +1,5 @@
 use rg_primitives::Fr;
-use rg_tree::{MerkleProof, MerkleTree, TREE_CAPACITY};
+use rg_tree::{MerkleProof, MerkleTree, TREE_CAPACITY, TREE_DEPTH, hash_left_right};
 
 use crate::Error;
 
@@ -38,6 +38,20 @@ impl TxidTrees {
             .ok_or(Error::Tree(rg_tree::Error::MissingLeaf(index)))?;
         Ok(tree.proof(index)?)
     }
+
+    /// `createDummyMerkleProof`: `leaf` first in a tree of zeros (0, not the Merkle zero), which is what a pre-transaction POI proves against, since its txid is in no tree yet.
+    pub fn dummy_proof(leaf: Fr) -> MerkleProof {
+        let elements = [Fr::from(0u64); TREE_DEPTH];
+        let root = elements
+            .iter()
+            .fold(leaf, |node, sibling| hash_left_right(&node, sibling));
+        MerkleProof {
+            leaf,
+            elements,
+            indices: 0,
+            root,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -57,5 +71,18 @@ mod tests {
         let proof = bulk.proof(TREE_CAPACITY as u64 + 1).unwrap();
         assert!(proof.verify());
         assert_eq!(proof.leaf, leaves[TREE_CAPACITY + 1]);
+    }
+
+    // Engine 9.6.0 `createDummyMerkleProof` of the txid in `txid.rs`'s test.
+    #[test]
+    fn dummy_proof_matches_the_engine() {
+        let txid = "21f03b068a26fd888a053c3318f9bdb2abe393a61a1c54da8e906b49fa607d29";
+        let leaf = rg_primitives::field::from_be_bytes_mod_order(&hex::decode(txid).unwrap());
+        let proof = TxidTrees::dummy_proof(leaf);
+        assert!(proof.verify());
+        assert_eq!(
+            hex::encode(rg_primitives::field::to_be_bytes(&proof.root)),
+            "03bff6e840d4c99138c3a4096b48cd5d40efa808f9b5e54bbaf17a2d5f29a05b"
+        );
     }
 }

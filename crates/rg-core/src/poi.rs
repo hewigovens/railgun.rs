@@ -4,12 +4,13 @@ use rg_keys::{ViewOnlyKeys, WalletKeys};
 use rg_notes::note::note_public_key;
 use rg_poi::node::{AGGREGATOR, Node, REQUIRED_LIST, blinded_hex};
 use rg_poi::{
-    FULL_CIRCUIT, MINI_CIRCUIT, OutputNote, ProofInputs, SpentNote, TxidTrees, blinded_commitment,
-    global_tree_position, railgun_txid, txid_leaf,
+    FULL_CIRCUIT, MINI_CIRCUIT, OutputNote, PRE_TRANSACTION_POSITION, ProofInputs, SpentNote,
+    TxidTrees, blinded_commitment, global_tree_position, railgun_txid, txid_leaf,
 };
 use rg_primitives::{Fr, field};
 use rg_sync::squid::{SquidTransaction, fetch_transactions, fetch_transactions_after};
 use rg_tree::TREE_CAPACITY;
+use rg_tx::TransferParams;
 use rg_wallet::{ScanResult, Txo};
 use serde_json::{Value, json};
 
@@ -59,6 +60,24 @@ fn leaf(t: &SquidTransaction) -> Fr {
     );
     let out = global_tree_position(t.utxo_tree_out, t.utxo_batch_start_position_out);
     txid_leaf(&txid, t.utxo_tree_in, out)
+}
+
+/// Proves on the smallest circuit that fits, unless `size` is given, and checks the public signals. snarkjs's projective third coordinate is dropped, as the engine does.
+fn prove_poi_inputs(
+    inputs: &ProofInputs,
+    blinded_out: &[Fr],
+    size: Option<usize>,
+    artifacts: &Artifacts,
+) -> Result<Value, Error> {
+    let fits = inputs.nullifiers.len().max(inputs.commitments_out.len()) <= MINI_CIRCUIT;
+    let n = size.unwrap_or(if fits { MINI_CIRCUIT } else { FULL_CIRCUIT });
+    let (proof, public) = prove(artifacts, Circuit::Poi(n), &inputs.circuit_inputs(n)?)?;
+    if public != inputs.public_inputs(n, blinded_out) {
+        return Err(Error::BadProof);
+    }
+    let p = rg_prover::proof_to_json(&proof);
+    let two = |v: &Value| json!(v.as_array().map(|a| &a[..2]));
+    Ok(json!({"pi_a": two(&p["pi_a"]), "pi_b": two(&p["pi_b"]), "pi_c": two(&p["pi_c"])}))
 }
 
 /// The blinded commitment the aggregator files a note under: `poseidon(commitment, npk, global position)`.
@@ -235,21 +254,12 @@ impl<S: ChainStore> Client<S> {
             list_proofs: self.node().merkle_proofs(REQUIRED_LIST, &blinded_in)?,
         };
 
-        let fits = tx.nullifiers.len().max(tx.commitments.len()) <= MINI_CIRCUIT;
-        let n = size.unwrap_or(if fits { MINI_CIRCUIT } else { FULL_CIRCUIT });
-        let (proof, public) = prove(artifacts, Circuit::Poi(n), &inputs.circuit_inputs(n)?)?;
-        if public != inputs.public_inputs(n, &blinded_out) {
-            return Err(Error::BadProof);
-        }
-
-        // snarkjs's projective third coordinate is dropped, as the engine does.
-        let p = rg_prover::proof_to_json(&proof);
-        let two = |v: &Value| json!(v.as_array().map(|a| &a[..2]));
+        let snark_proof = prove_poi_inputs(&inputs, &blinded_out, size, artifacts)?;
         let blinded_out: Vec<String> = blinded_out.iter().map(blinded_hex).collect();
         // The aggregator tracks an unshield by its txid (`getForUnshield`).
         let unshield = unshield_txid.as_ref().map(blinded_hex);
         let data = json!({
-            "snarkProof": {"pi_a": two(&p["pi_a"]), "pi_b": two(&p["pi_b"]), "pi_c": two(&p["pi_c"])},
+            "snarkProof": snark_proof,
             "poiMerkleroots": inputs.list_proofs.iter().map(|l| hex32(&l.root)).collect::<Vec<_>>(),
             "txidMerkleroot": hex32(&inputs.txid_proof.root),
             "txidMerklerootIndex": txids.latest(),
@@ -265,6 +275,81 @@ impl<S: ChainStore> Client<S> {
             blinded,
             data: vec![data],
         })
+    }
+
+    /// A pre-transaction POI for a planned transaction (`generatePreTransactionPOI`): the same proof, made before the transaction exists, against a stand-in txid tree and output position. A broadcaster checks it, and passes it to the aggregator, before it pays gas. Returns the txid leaf hash the proof is filed under.
+    pub(crate) fn prove_pre_transaction(
+        &self,
+        keys: &WalletKeys,
+        params: &TransferParams,
+        artifacts: &Artifacts,
+    ) -> Result<(String, Value), Error> {
+        let prepared = params.prepare(keys)?;
+        let txid = railgun_txid(
+            &prepared.nullifiers,
+            &prepared.commitments,
+            &prepared.bound_params_hash,
+        );
+        let tree = u32::from(params.tree);
+        let leaf = txid_leaf(&txid, tree, PRE_TRANSACTION_POSITION);
+        let blinded_in: Vec<String> = params
+            .inputs
+            .iter()
+            .map(|i| {
+                let npk = note_public_key(&keys.master_public_key, &i.random);
+                let at = global_tree_position(tree, i.position as u32);
+                blinded_hex(&blinded_commitment(&i.proof.leaf, &npk, at))
+            })
+            .collect();
+        let outputs: Vec<OutputNote> = params
+            .outputs
+            .iter()
+            .map(|o| OutputNote {
+                npk: o.note.note_public_key(),
+                value: o.note.value,
+            })
+            .collect();
+        let blinded_out: Vec<Fr> = prepared
+            .commitments
+            .iter()
+            .zip(&outputs)
+            .enumerate()
+            .map(|(i, (c, o))| blinded_commitment(c, &o.npk, PRE_TRANSACTION_POSITION + i as u64))
+            .collect();
+        let unshield_txid = params.unshield.is_some().then_some(txid);
+        let inputs = ProofInputs {
+            txid_proof: TxidTrees::dummy_proof(leaf),
+            bound_params_hash: prepared.bound_params_hash,
+            nullifiers: prepared.nullifiers,
+            commitments_out: prepared.commitments,
+            spending_public_key: [keys.spending_public_key.x, keys.spending_public_key.y],
+            nullifying_key: keys.nullifying_key,
+            token_hash: fr(&params.token_hash),
+            spent: params
+                .inputs
+                .iter()
+                .map(|i| SpentNote {
+                    random: fr(&i.random),
+                    value: i.value,
+                    position: i.position as u32,
+                })
+                .collect(),
+            utxo_tree_in: tree,
+            outputs,
+            global_position_out: PRE_TRANSACTION_POSITION,
+            unshield_txid,
+            list_proofs: self.node().merkle_proofs(REQUIRED_LIST, &blinded_in)?,
+        };
+        let snark_proof = prove_poi_inputs(&inputs, &blinded_out, None, artifacts)?;
+        let unshield = unshield_txid.as_ref().map(blinded_hex);
+        let data = json!({
+            "snarkProof": snark_proof,
+            "txidMerkleroot": hex32(&inputs.txid_proof.root),
+            "poiMerkleroots": inputs.list_proofs.iter().map(|l| hex32(&l.root)).collect::<Vec<_>>(),
+            "blindedCommitmentsOut": blinded_out.iter().map(blinded_hex).collect::<Vec<_>>(),
+            "railgunTxidIfHasUnshield": unshield.as_deref().unwrap_or("0x00"),
+        });
+        Ok((hex32(&leaf), data))
     }
 
     /// Submits each Railgun transaction's proof.

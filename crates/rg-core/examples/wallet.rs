@@ -12,6 +12,10 @@
 //!   send <evm key file> <transaction json>           quotes, signs, sends and waits
 //!   shield <evm key file> <token> <value>             approves if needed, then shields to this wallet
 //!   shield-eth <evm key file> <wei>                   shields ETH to this wallet as wrapped ETH
+//!   broadcasters <token>                              live offers for the token, cheapest first
+//!   broadcast-transfer <recipient 0zk> <token> <value> [--send]
+//!   broadcast-unshield <to> <token> <value> [--send]  through the cheapest broadcaster, which pays gas:
+//!                                                     proves and prints the fee, and with --send hands it over
 //!
 //! An EVM key file holds one `0x` hex private key. That account pays gas and is public.
 //!   poi <tx hash> [--submit | --full]
@@ -21,8 +25,8 @@
 use std::path::Path;
 
 use rg_core::{
-    Artifacts, ChainStore, Client, FileStore, Receipt, Shield, Transfer, Unshield,
-    UnshieldBaseToken, UnsignedTx,
+    Artifacts, BroadcasterFees, Broadcasters, ChainStore, Client, FileStore, POI_LIST, Receipt,
+    Shield, Transfer, Unshield, UnshieldBaseToken, UnsignedTx, Waku,
 };
 use rg_keys::{EvmAddress, EvmKey, WalletKeys, Zeroizing};
 use rg_sync::Network;
@@ -98,6 +102,71 @@ fn print_history<S: ChainStore>(
             e.kind,
             token(&e.token_hash)?,
             e.value
+        );
+    }
+    Ok(())
+}
+
+fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_millis() as u64)
+}
+
+/// `broadcasters`, `broadcast-transfer` and `broadcast-unshield`.
+fn broadcast_command<S: ChainStore>(
+    client: &Client<S>,
+    keys: &WalletKeys,
+    artifacts: &Artifacts,
+    a: &[String],
+) -> Result<(), Box<dyn std::error::Error>> {
+    let chain_id = Network::by_name(&a[1]).ok_or("unknown network")?.chain_id;
+    let mut broadcasters = Broadcasters::new(Waku::railgun()?, chain_id);
+    let at = if a[5] == "broadcasters" { 6 } else { 7 };
+    let token = a[at].parse::<EvmAddress>()?.0;
+    if a[5] == "broadcasters" {
+        let mut live: Vec<BroadcasterFees> = broadcasters
+            .offers()?
+            .into_iter()
+            .filter(|o| o.is_live(now_ms()) && o.fees.contains_key(&token))
+            .collect();
+        live.sort_by_key(|o| o.fees[&token]);
+        for o in live {
+            let id = o.identifier.as_deref().unwrap_or("");
+            println!(
+                "{} {} {id} v{} reliability {}",
+                o.fees[&token], o.railgun_address, o.version, o.reliability
+            );
+        }
+        return Ok(());
+    }
+    let offer = broadcasters
+        .best_offer(&token, POI_LIST)?
+        .ok_or("no live broadcaster takes this token")?;
+    let tx = if a[5] == "broadcast-transfer" {
+        let transfer = Transfer {
+            recipient: &a[6],
+            token,
+            value: a[8].parse()?,
+            memo: None,
+        };
+        client.build_broadcast_transfer(keys, &transfer, &offer, artifacts)?
+    } else {
+        let unshield = Unshield {
+            to: a[6].parse::<EvmAddress>()?.0,
+            token,
+            value: a[8].parse()?,
+        };
+        client.build_broadcast_unshield(keys, &unshield, &offer, artifacts)?
+    };
+    println!(
+        "fee {} to {} ({} gas at {} wei)",
+        tx.fee, offer.railgun_address, tx.gas_estimate, tx.gas_price
+    );
+    if a.get(9).map(String::as_str) == Some("--send") {
+        println!(
+            "0x{}",
+            hex::encode(client.broadcast(&mut broadcasters, &tx)?)
         );
     }
     Ok(())
@@ -202,6 +271,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 client.submit_poi(&proof)?;
                 println!("after: {:?}", client.poi_status(&proof)?);
             }
+        }
+        "broadcasters" | "broadcast-transfer" | "broadcast-unshield" => {
+            broadcast_command(&client, &keys, &artifacts, &a)?;
         }
         other => return Err(format!("unknown command {other}").into()),
     }

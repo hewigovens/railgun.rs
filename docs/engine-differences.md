@@ -36,3 +36,12 @@ engine accepts. Missing features are in the README under "Not supported yet".
 - History is simpler than the SDK's: shields, receipts, sends and unshields per token and
   transaction. Change and transfers to yourself are left out, and an unshield's value is
   what it took from the wallet, before the contract's fee.
+- Broadcaster fee offers are checked with Ed25519 `verify_strict`, which rejects the
+  non-canonical signatures and small-order keys noble-ed25519 1.7 accepts. A broadcaster
+  signing with the SDK never makes one.
+- The Waku client reads offers and answers with store queries instead of filter
+  subscriptions. Discovery checks the ENR tree root's signature against the pinned tree
+  key and every entry against its hash label, and falls back to the shipped nodes on any
+  failure; it does not check each ENR's own signature, which the hash chain already covers.
+- Pre-transaction POIs are made for the one required list. Offers that require any other
+  list are skipped.

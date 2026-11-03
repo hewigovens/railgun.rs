@@ -10,6 +10,7 @@ members = [
   "crates/rg-prover",
   "crates/rg-tx",
   "crates/rg-poi",
+  "crates/rg-broadcaster",
   "crates/rg-core",
   "crates/rg-uniffi",
 ]
@@ -44,11 +45,15 @@ ctr = "0.9"
 curve25519-dalek = "4"
 ed25519-dalek = "2"
 hex = "0.4"
+hickory-resolver = { version = "0.26", default-features = false, features = ["system-config", "tokio"] }
 hmac = "0.12"
 k256 = { version = "0.13", default-features = false, features = ["ecdsa", "sha256", "std"] }
+libp2p = { version = "0.57", default-features = false, features = ["tokio", "tcp", "noise", "yamux", "request-response", "identify", "macros", "secp256k1"] }
+prost = "0.14"
 rand = "0.8"
 rayon = "1"
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+rg-broadcaster = { path = "crates/rg-broadcaster" }
 rg-core = { path = "crates/rg-core" }
 rg-keys = { path = "crates/rg-keys" }
 rg-notes = { path = "crates/rg-notes" }
@@ -63,6 +68,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
 thiserror = "2"
+tokio = { version = "1", default-features = false, features = ["rt", "time"] }
 tiny-keccak = { version = "2", features = ["keccak"] }
 unicode-normalization = "0.1"
 uniffi = { version = "0.32", default-features = false }

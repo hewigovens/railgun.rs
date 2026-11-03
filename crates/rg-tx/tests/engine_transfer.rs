@@ -186,6 +186,7 @@ fn rust_prepared(t: &Value, mnemonic: &str) -> (WalletKeys, Prepared) {
         wallet_source: t["send"]["walletSource"].as_str().unwrap(),
         chain_id: chain_full_network_id(0, 11_155_111),
         min_gas_price: 0,
+        broadcaster_fee: None,
     };
     let [params] = &plan_transfer(&keys, &state, &scan, &req, engine_fill(t)).unwrap()[..] else {
         panic!("one note covers the engine's transfer");

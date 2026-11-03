@@ -27,7 +27,7 @@ A Rust core for a private Railgun wallet, library first. `README.md` has the ove
 - Use `pub(crate)` or `pub(super)`, never path-scoped `pub(in ...)`.
 - A function over 120 lines fails `clippy::too_many_lines`; split it by responsibility unless it is a vector table.
 
-Dependency direction, never inverted: `rg-primitives` → `rg-keys`, `rg-notes`, `rg-tree` → `rg-sync` → `rg-wallet` → `rg-tx` → `rg-core` → `rg-uniffi`. `rg-prover` knows nothing about Railgun, and `rg-poi` depends only on `rg-primitives` and `rg-tree`; `rg-core` joins them.
+Dependency direction, never inverted: `rg-primitives` → `rg-keys`, `rg-notes`, `rg-tree` → `rg-sync` → `rg-wallet` → `rg-tx` → `rg-core` → `rg-uniffi`. `rg-prover` knows nothing about Railgun, `rg-poi` depends only on `rg-primitives` and `rg-tree`, and `rg-broadcaster` only on `rg-primitives` and `rg-keys`; `rg-core` joins them.
 
 ## UniFFI
 

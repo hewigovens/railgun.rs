@@ -2,8 +2,8 @@
 
 A Rust implementation of a [Railgun](https://railgun.org) wallet: keys and 0zk addresses,
 note encryption, chain sync and scanning, Groth16 proofs for private transfers and
-unshields, Private Proof of Innocence (POI), and signing and sending. Swift and Kotlin
-bindings come from UniFFI.
+unshields, Private Proof of Innocence (POI), broadcasters, and signing and sending. Swift
+and Kotlin bindings come from UniFFI.
 
 It is a library first. It replaces the TS engine and wallet SDK for apps that would
 rather not ship Node.js, and its bytes match theirs. There is no app here; the `wallet`
@@ -27,6 +27,8 @@ example is a command line over the API.
 - Native ETH: shielding it, and unshielding to it, through the RelayAdapt contract.
 - View-only wallets from a shareable viewing key, in the engine's format.
 - POI proofs, submitted to the aggregator, so recipients can spend what they receive.
+- Broadcasters over Waku: signed fee offers, the fee note, pre-transaction POIs, and the
+  encrypted request and answer, so no public account of yours pays gas or shows on chain.
 - Shielding ERC-20 tokens, fee quotes, and EIP-1559 signing and sending.
 - Checks for mnemonics, 0zk addresses and EIP-55 checksummed `0x` addresses.
 - Ethereum, Arbitrum and Sepolia.
@@ -36,7 +38,8 @@ ciphertexts, bound params, circuit inputs, calldata and witnesses match byte for
 The engine also gets the same trees, notes and balances for all of Sepolia's history up
 to block 12031295. On Arbitrum, Rust-built transfers, an unshield and a two-input
 transfer were mined and their POI proofs reached `Valid`. Anon wallet saw the funds as
-spendable.
+spendable. So did an 11-note transfer split into two Railgun transactions, an unshield to
+ETH through RelayAdapt, and a transfer a broadcaster submitted over Waku.
 
 ## Crates
 
@@ -51,7 +54,8 @@ spendable.
 | `rg-prover` | Circom witness from the circuit wasm (wasmi or wasmtime), snarkjs zkeys, Groth16 on arkworks |
 | `rg-tx` | Note selection, outputs, bound params, the spending signature, circuit inputs, calldata, shield, EIP-1559 |
 | `rg-poi` | Txid trees, blinded commitments, POI circuit inputs, the aggregator client |
-| `rg-core` | `Client`: store, sync, scan, transfers, unshields, POI, sending |
+| `rg-broadcaster` | Broadcaster fee offers, sealed transact requests, and a Waku light client behind `waku` |
+| `rg-core` | `Client`: store, sync, scan, transfers, unshields, POI, sending, broadcasting |
 | `rg-uniffi` | Swift and Kotlin bindings over `rg-core` |
 
 `docs/architecture.md` has the flows, `docs/protocol.md` the byte formats, and
@@ -84,8 +88,21 @@ The first sync on a mainnet seeds old leaves from the squid. Circuit artifacts d
 the first time a proof needs them. After a transfer is mined, `client.prove_poi` and
 `client.submit_poi` give it POI.
 
+To send through a broadcaster instead, which pays the gas and takes its fee privately:
+
+```rust
+use rg_core::{Broadcasters, POI_LIST, Waku};
+
+let mut broadcasters = Broadcasters::new(Waku::railgun()?, Network::ARBITRUM.chain_id);
+let offer = broadcasters.best_offer(&weth, POI_LIST)?.ok_or("no broadcaster")?;
+let artifacts = Artifacts::new("data/artifacts");
+let tx = client.build_broadcast_transfer(&keys, &transfer, &offer, &artifacts)?; // show tx.fee
+let hash = client.broadcast(&mut broadcasters, &tx)?;
+```
+
 `crates/rg-core/examples/wallet.rs` covers `sync`, `balance`, `history`, `transfer`,
-`unshield`, `unshield-eth`, `shield`, `shield-eth`, `estimate`, `send` and `poi`:
+`unshield`, `unshield-eth`, `shield`, `shield-eth`, `estimate`, `send`, `poi`,
+`broadcasters`, `broadcast-transfer` and `broadcast-unshield`:
 
 ```sh
 cargo run --release -p rg-core --example wallet -- arbitrum <rpc url> <data dir> <mnemonic file> balance
@@ -110,7 +127,8 @@ again on every load.
 
 ## Not supported yet
 
-- Broadcasters, so for now a public account pays gas and shows on chain.
+- Unshielding to ETH, and RelayAdapt calls in general, through a broadcaster.
+- Waku over WebSockets, which a browser would need.
 - NFTs.
 - Legacy (pre-2023) events, so a wallet with notes from before the squid seed cannot
   scan them.

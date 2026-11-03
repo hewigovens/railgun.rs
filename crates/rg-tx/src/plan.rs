@@ -14,6 +14,7 @@ pub struct TransferRequest<'a> {
     pub wallet_source: &'a str,
     pub chain_id: u64,
     pub min_gas_price: u128,
+    pub broadcaster_fee: Option<BroadcasterFee>,
 }
 
 /// An unshield of an ERC20 from a wallet scan.
@@ -24,6 +25,14 @@ pub struct UnshieldRequest<'a> {
     pub wallet_source: &'a str,
     pub chain_id: u64,
     pub min_gas_price: u128,
+    pub broadcaster_fee: Option<BroadcasterFee>,
+}
+
+/// What a broadcaster charges for submitting the batch, paid in the token being spent: the first output of the first transaction, where the broadcaster looks for it.
+#[derive(Clone, Debug)]
+pub struct BroadcasterFee {
+    pub recipient: AddressData,
+    pub value: u128,
 }
 
 /// Most inputs in one transaction, the engine's limit.
@@ -126,11 +135,12 @@ struct Spend<'a> {
     wallet_source: &'a str,
     chain_id: u64,
     min_gas_price: u128,
+    broadcaster_fee: Option<BroadcasterFee>,
 }
 
 type Fill<'f> = &'f mut dyn FnMut(&mut [u8]);
 
-/// One transaction per note group. `pay` makes the outputs that pay out a group's share, and whatever the last group has left over goes back to this wallet as change.
+/// One transaction per note group. The first group pays the broadcaster fee first, `pay` makes the outputs that pay out a group's share, and whatever the last group has left over goes back to this wallet as change.
 fn plan_spend<'a>(
     keys: &WalletKeys,
     state: &rg_sync::SyncState,
@@ -142,20 +152,40 @@ fn plan_spend<'a>(
     if spend.value == 0 {
         return Err(Error::ZeroValue);
     }
-    let groups = select_notes(scan.unspent(), &spend.token_hash, spend.value)
-        .ok_or(Error::InsufficientNote(spend.value))?;
-    let mut left = spend.value;
+    let fee = spend.broadcaster_fee.as_ref().map_or(0, |f| f.value);
+    let needed = spend.value + fee;
+    let groups = select_notes(scan.unspent(), &spend.token_hash, needed)
+        .ok_or(Error::InsufficientNote(needed))?;
+    let mut left = needed;
     let mut planned = Vec::with_capacity(groups.len());
-    for notes in &groups {
+    for (index, notes) in groups.iter().enumerate() {
         let (inputs, total) = spend_notes(state, notes)?;
-        let paid = total.min(left);
-        left -= paid;
-        let (mut outs, unshield) = pay(paid, &mut *fill);
-        if total > paid {
+        let taken = total.min(left);
+        left -= taken;
+        let mut outs = Vec::new();
+        let mut share = taken;
+        if let Some(fee) = spend.broadcaster_fee.as_ref().filter(|_| index == 0) {
+            share = share
+                .checked_sub(fee.value)
+                .ok_or(Error::InsufficientNote(needed))?;
+            outs.push(fee_note(
+                fee,
+                &spend.token_hash,
+                spend.wallet_source,
+                &mut *fill,
+            ));
+        }
+        let (paid, unshield) = if share > 0 {
+            pay(share, &mut *fill)
+        } else {
+            (Vec::new(), None)
+        };
+        outs.extend(paid);
+        if total > taken {
             outs.push(change_note(
                 keys,
                 &spend.token_hash,
-                total - paid,
+                total - taken,
                 spend.wallet_source,
                 &mut *fill,
             ));
@@ -189,6 +219,7 @@ pub fn plan_transfer<'a>(
         wallet_source: req.wallet_source,
         chain_id: req.chain_id,
         min_gas_price: req.min_gas_price,
+        broadcaster_fee: req.broadcaster_fee.clone(),
     };
     plan_spend(keys, state, scan, &spend, &mut fill, |value, fill| {
         let mut sender_random = rg_notes::transact::SENDER_RANDOM_NULL;
@@ -210,6 +241,30 @@ pub fn plan_transfer<'a>(
         };
         (vec![note], None)
     })
+}
+
+/// Never shows the sender, as the engine's fee notes do not.
+fn fee_note<'a>(
+    fee: &BroadcasterFee,
+    token_hash: &[u8; 32],
+    wallet_source: &'a str,
+    fill: Fill,
+) -> OutputNote<'a> {
+    let mut sender_random = [0u8; 15];
+    fill(&mut sender_random);
+    let mut random = [0u8; 16];
+    fill(&mut random);
+    OutputNote {
+        receiver_master_public_key: fee.recipient.master_public_key,
+        receiver_viewing_public_key: fee.recipient.viewing_public_key,
+        token_hash: *token_hash,
+        value: fee.value,
+        random,
+        sender_random,
+        output_type: OutputType::BroadcasterFee,
+        wallet_source,
+        memo_text: None,
+    }
 }
 
 fn change_note<'a>(
@@ -265,6 +320,7 @@ pub fn plan_unshield<'a>(
         wallet_source: req.wallet_source,
         chain_id: req.chain_id,
         min_gas_price: req.min_gas_price,
+        broadcaster_fee: req.broadcaster_fee.clone(),
     };
     plan_spend(keys, state, scan, &spend, &mut fill, |value, _| {
         let unshield = UnshieldOutput {
@@ -388,19 +444,42 @@ mod tests {
             wallet_source: "test",
             chain_id: 1,
             min_gas_price: 0,
+            broadcaster_fee: None,
         };
-        let planned = plan_unshield(&keys, &state, &scan, &req, |b| b.fill(3)).unwrap();
-        let shape: Vec<_> = planned
-            .iter()
-            .map(|p| {
-                let change: Vec<u128> = p.outputs.iter().map(|o| o.note.value).collect();
-                (p.tree, p.unshield.unwrap().value, change)
-            })
-            .collect();
-        assert_eq!(shape, [(0, 6, vec![]), (1, 2, vec![3])]);
-        for p in &planned {
-            p.prepare(&keys).unwrap();
-        }
+        let shape = |req: &UnshieldRequest| {
+            let planned = plan_unshield(&keys, &state, &scan, req, |b| b.fill(3)).unwrap();
+            for p in &planned {
+                p.prepare(&keys).unwrap();
+            }
+            planned
+                .iter()
+                .map(|p| {
+                    let notes = p.outputs.iter().map(|o| (o.note.output_type, o.note.value));
+                    (p.tree, p.unshield.unwrap().value, notes.collect())
+                })
+                .collect::<Vec<(u16, u128, Vec<_>)>>()
+        };
+        assert_eq!(
+            shape(&req),
+            [(0, 6, vec![]), (1, 2, vec![(OutputType::Change, 3)])]
+        );
+
+        let fee = BroadcasterFee {
+            recipient: rg_keys::decode_address(&keys.address().unwrap()).unwrap(),
+            value: 2,
+        };
+        let with_fee = UnshieldRequest {
+            value: 7,
+            broadcaster_fee: Some(fee),
+            ..req
+        };
+        assert_eq!(
+            shape(&with_fee),
+            [
+                (0, 4, vec![(OutputType::BroadcasterFee, 2)]),
+                (1, 3, vec![(OutputType::Change, 2)])
+            ]
+        );
     }
 
     // Expected value from engine 9.6.0's UnshieldNoteERC20.

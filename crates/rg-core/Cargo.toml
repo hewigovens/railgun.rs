@@ -13,6 +13,7 @@ brotli.workspace = true
 hex.workspace = true
 rand.workspace = true
 reqwest.workspace = true
+rg-broadcaster = { workspace = true, features = ["waku"] }
 rg-keys.workspace = true
 rg-notes.workspace = true
 rg-poi = { workspace = true, features = ["rpc"] }

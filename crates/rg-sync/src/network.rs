@@ -13,6 +13,8 @@ pub struct Network {
     pub squid: Option<&'static str>,
     /// Blocks refetched on every sync, in case they were reorged.
     pub reorg_window: u64,
+    /// Broadcaster batches commit to the legacy gas price they are offered at, and the contract holds the broadcaster to it. Not on L2s, where `tx.gasprice` is not the price offered (`shouldSetOverallBatchMinGasPriceForNetwork`).
+    pub broadcaster_min_gas_price: bool,
 }
 
 impl Network {
@@ -25,6 +27,7 @@ impl Network {
         relay_adapt: "0x7e3d929EbD5bDC84d02Bd3205c777578f33A214D",
         squid: None,
         reorg_window: 64,
+        broadcaster_min_gas_price: true,
     };
     pub const ETHEREUM: Network = Network {
         name: "ethereum",
@@ -35,6 +38,7 @@ impl Network {
         relay_adapt: "0xAc9f360Ae85469B27aEDdEaFC579Ef2d052aD405",
         squid: Some("https://rail-squid.squids.live/squid-railgun-ethereum-v2/graphql"),
         reorg_window: 64,
+        broadcaster_min_gas_price: true,
     };
     pub const ARBITRUM: Network = Network {
         name: "arbitrum",
@@ -45,6 +49,7 @@ impl Network {
         relay_adapt: "0xB4F2d77bD12c6b548Ae398244d7FAD4ABCE4D89b",
         squid: Some("https://rail-squid.squids.live/squid-railgun-arbitrum-v2/graphql"),
         reorg_window: 2_400,
+        broadcaster_min_gas_price: false,
     };
 
     pub fn by_name(name: &str) -> Option<Network> {

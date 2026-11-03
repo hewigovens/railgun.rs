@@ -34,6 +34,12 @@ pub enum Error {
     WrongChain(u64, u64),
     #[error("{0} of this token is waiting for POI, so the spendable notes do not cover it yet")]
     AwaitingPoi(u128),
+    #[error("broadcaster: {0}")]
+    Broadcaster(#[from] rg_broadcaster::Error),
+    #[error("the broadcaster takes no fee in this token")]
+    NotOffered,
+    #[error("the broadcaster refused the transaction: {0}")]
+    Refused(String),
     #[error("transaction {0} is not one this wallet can prove: {1}")]
     NotProvable(String, &'static str),
 }

@@ -11,5 +11,7 @@ mod txid_trees;
 
 pub use error::Error;
 pub use proof_inputs::{FULL_CIRCUIT, ListProof, MINI_CIRCUIT, OutputNote, ProofInputs, SpentNote};
-pub use txid::{blinded_commitment, global_tree_position, railgun_txid, txid_leaf};
+pub use txid::{
+    PRE_TRANSACTION_POSITION, blinded_commitment, global_tree_position, railgun_txid, txid_leaf,
+};
 pub use txid_trees::TxidTrees;

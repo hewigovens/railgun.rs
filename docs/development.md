@@ -95,7 +95,14 @@ $W estimate <from> transfer.jsonl         # fee quote
 $W send <evm-key-file> transfer.jsonl
 $W sync
 $W poi <tx hash> --submit
+$W broadcasters $WETH                     # live offers, cheapest first
+$W broadcast-transfer $RECIPIENT $WETH <value> [--send]   # prints the fee; --send hands it over
+$W broadcast-unshield <to> $WETH <value> [--send]
 ```
+
+A broadcast needs the fee on top of the value in spendable notes of that token. Once it
+is mined, `poi <hash> --submit` as for any send: the broadcaster's pre-transaction check
+leaves only its own fee note `Valid`.
 
 `poi` needs the squid and the aggregator to have the transaction, which usually takes
 under a minute. Do not leave a wallet with the same keys open in Railway, or it submits

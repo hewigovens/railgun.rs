@@ -118,7 +118,16 @@ Proofs are not deterministic, so the test is that the verifying key and the cont
 
 ## Relaying
 
-A self-signed transaction links the account paying gas to it. Broadcasters talk over Waku (`waku-broadcaster-client`). Unshielding to native ETH, and DeFi calls, go through RelayAdapt (`contracts/relay-adapt/*`). This core does neither yet.
+A self-signed transaction links the account paying gas to it. Native ETH and DeFi calls go through RelayAdapt (`contracts/relay-adapt/*`); this core uses it for ETH.
+
+Broadcasters (`waku-broadcaster-client` 10.0.1, shared-models 8.2.1):
+
+- Waku cluster 5, shard 1, pubsub topic `/waku/2/rs/5/1`. Content topics `/railgun/v2/0-{chainId}-fees/json`, `-transact/json` and `-transact-response/json`. Store v3 `/vac/waku/store-query/3.0.0` and light push v3 `/vac/waku/lightpush/3.0.0` over TCP, Noise and yamux, with timestamps in nanoseconds. Nodes ask `/vac/waku/metadata/1.0.0` for the cluster and drop peers on another. The fleet's ENR tree is `enrtree://APMYHUVNQWHJNPI5L2KQ765EMCKUAMRWPUH3U2QIKPK6XEV3OW442@discovery.rootedinprivacy.com`, and the `waku2` field's bits are relay, store, filter, light push.
+- A fee message is `{data, signature}`: `data` is the hex of the offer's UTF-8 JSON, and `signature` is Ed25519 over those bytes by the viewing key in the offer's `railgunAddress`. Offers carry `fees` (token to per-gas rate, hex, scaled by 10^18), `feeExpiration` (ms), `feesID`, `availableWallets`, `version` (8.0.0 to 8.999.0 accepted), `relayAdapt`, `requiredPOIListKeys` and `reliability`.
+- A request is `{method: "transact", params: {pubkey, encryptedData}}`. `pubkey` is a one-time Ed25519 public key, and the shared key is noble-ed25519's `getSharedSecret`: X25519 of the clamped sha512 head of the one-time key with the broadcaster's viewing key in Montgomery form, unhashed. `encryptedData` is `[0x ‖ iv ‖ tag, 0x ‖ ciphertext]`, AES-256-GCM with a 16-byte IV, of the JSON `{txidVersion, to, data, broadcasterViewingKey, chainID, chainType, feesID, useRelayAdapt, devLog, minVersion, maxVersion, preTransactionPOIsPerTxidLeafPerList, transactType: "COMMON", minGasPrice}`.
+- The answer is `{result: encryptedData}` under the same key, holding `{txHash}` or `{error}`.
+- `preTransactionPOIsPerTxidLeafPerList` maps list key to txid leaf hash (64 hex digits) to `{snarkProof, txidMerkleroot, poiMerkleroots, blindedCommitmentsOut, railgunTxidIfHasUnshield}`. The leaf is `poseidon(txid, treeIn, P)` with P = 199999 × 65536 + 199999, the txid proof is `createDummyMerkleProof` (index 0, sixteen zero siblings), and output i is blinded at P + i.
+- The fee note is the first output of the first transaction, type `BroadcasterFee`, sender hidden.
 
 ## Where bytes went wrong most easily
 
