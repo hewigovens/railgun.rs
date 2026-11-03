@@ -182,6 +182,14 @@ fn bech32_vectors() {
     for (pubkey, chain, address) in vectors {
         let padded = format!("{pubkey:0>64}");
         let bytes = h32(&padded);
+        // The last vector's "MPK" is above the field modulus, which a real MPK (a Poseidon output) never is, so decoding refuses it.
+        if bytes > MODULUS_BE {
+            assert!(matches!(
+                decode_address(address),
+                Err(Error::InvalidAddress("master public key out of range"))
+            ));
+            continue;
+        }
         let data = AddressData {
             master_public_key: from_be_bytes_mod_order(&bytes),
             viewing_public_key: bytes,
@@ -189,10 +197,6 @@ fn bech32_vectors() {
             version: 1,
         };
         assert_eq!(decode_address(address).unwrap(), data);
-        // The last vector's "MPK" is above the field modulus, which a real MPK (a Poseidon output) never is. The engine writes it unreduced; an Fr can't hold it, so only the decode side is comparable there.
-        if bytes > MODULUS_BE {
-            continue;
-        }
         let encoded = encode_address(&data).unwrap();
         assert_eq!(encoded, address);
         assert_eq!(encoded.len(), 127);

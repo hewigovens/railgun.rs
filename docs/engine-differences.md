@@ -1,0 +1,31 @@
+# Differences from the TS engine
+
+`@railgun-community/engine` 9.6.0 is the reference, and bytes on the wire match it. These
+are the places where this library behaves differently, mostly by rejecting input the
+engine accepts. Missing features are in the README under "Not supported yet".
+
+- `mnemonic_to_seed` rejects unknown words and a bad BIP39 checksum. The engine has
+  `Mnemonic.validate` but never calls it when creating a wallet: `Mnemonic.toSeed` runs
+  PBKDF2 on any words, and wallet SDK 11.2.0 passes the mnemonic straight through. Both
+  NFKD-normalize the mnemonic and password first, so a non-ASCII password gives the same
+  seed either way.
+- `decode_address` rejects an address whose master public key is at or above the BN254
+  modulus; the engine reads any 256-bit value. A real MPK is a Poseidon output and never
+  is, so such an address belongs to nobody. One engine test vector has one.
+- `babyjubjub::Point::mul_le` is variable time and only used for public scalars
+  (verification). Key derivation and signing use `mul_ct`, a Montgomery ladder that runs
+  the same field operations for every scalar. arkworks' field arithmetic underneath is
+  not audited for constant time.
+- `ed25519::shared_key` accepts a non-canonical y encoding, as the engine's wasm path
+  (curve25519-dalek) does; blinding and unblinding reject it, as noble-ed25519 does. This
+  matches the engine on purpose: rejecting more would hide notes the engine shows.
+- `wallet_source::encode` rejects sources over 16 characters; the engine only enforces
+  that when a wallet source is set, not when encoding.
+- `memo::decrypt_annotation` returns none for annotation data under 32 bytes, where the
+  engine would return truncated fields.
+- `rg_wallet` drops a shield note whose note public key is not
+  `poseidon(ourMPK, random)`; the engine keeps any shield whose random decrypts. Such a
+  note could not be spent.
+- History is simpler than the SDK's: shields, receipts, sends and unshields per token and
+  transaction. Change and transfers to yourself are left out, and an unshield's value is
+  what it took from the wallet, before the contract's fee.

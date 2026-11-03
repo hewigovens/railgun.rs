@@ -1,7 +1,6 @@
 //! Vectors copied from the engine's own tests (MIT), engine 6e2614d:
 //! src/note/__tests__/{note-util,memo,transact-note,shield-note}.test.ts
 
-use rg_keys::decode_address;
 use rg_notes::memo::{decode_text, decrypt_annotation, encode_text, encrypt_annotation_v2};
 use rg_notes::note::{commitment, note_public_key, nullifier};
 use rg_notes::shield::SHIELD_PRIVATE_KEY_SIGNATURE_MESSAGE;
@@ -86,8 +85,10 @@ fn shield_signature_message() {
 #[allow(clippy::too_many_lines)] // One vector table.
 fn legacy_notes_random_npk_and_hash() {
     // transact-note.test.ts "Should serialize and deserialize notes": the random is AES-256-GCM encrypted under the viewing private key, iv || tag then data.
-    let address = "0zk1qxvsy4jxshey7wtzv0ry7kp24x58fxtsg5yuvzrzjv93l8mayk8garv7j6fe3z53l7vsy4jxshey7wtzv0ry7kp24x58fxtsg5yuvzrzjv93l8mayk8guau6ef8";
-    let mpk = decode_address(address).unwrap().master_public_key;
+    // The test's address carries an "MPK" above the field modulus, which `decode_address` refuses; Poseidon reduces it, so the vectors use the reduced value.
+    let mpk = from_be_bytes_mod_order(&h::<32>(
+        "9902564685f24f396263c64f582aa9a87499704509c60862930b1f9f7d258e8e",
+    ));
     // (npk, tokenHash, value, encryptedRandom[0], encryptedRandom[1], random, vpk, hash)
     let vectors = [
         (

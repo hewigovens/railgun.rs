@@ -3215,6 +3215,7 @@ dependencies = [
  "sha2",
  "thiserror",
  "tiny-keccak",
+ "unicode-normalization",
  "zeroize",
 ]
 

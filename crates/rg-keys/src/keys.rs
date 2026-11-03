@@ -7,6 +7,7 @@ use rand::RngCore;
 use rand::rngs::OsRng;
 use rg_primitives::babyjubjub::{self, Point};
 use rg_primitives::{Fr, PrivateKey, field, poseidon};
+use unicode_normalization::UnicodeNormalization;
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 use crate::Error;
@@ -46,18 +47,25 @@ impl fmt::Debug for WalletKeys {
     }
 }
 
-/// BIP39 seed. The engine's `Mnemonic.toSeed` does not check the checksum; this parses the mnemonic and rejects bad checksums, which is stricter.
+/// BIP39 seed, with the mnemonic and password NFKD-normalized as BIP39 and the engine do. Unlike the engine's `Mnemonic.toSeed`, it rejects unknown words and a bad checksum.
 pub fn mnemonic_to_seed(mnemonic: &str, password: &str) -> Result<Zeroizing<[u8; 64]>, Error> {
-    let m = bip39::Mnemonic::parse_normalized(mnemonic)
-        .map_err(|e| Error::InvalidMnemonic(e.to_string()))?;
-    Ok(Zeroizing::new(m.to_seed_normalized(password)))
+    let m = parse_mnemonic(mnemonic)?;
+    Ok(Zeroizing::new(m.to_seed_normalized(&nfkd(password))))
 }
 
 /// Checks the words and the checksum without deriving the seed, which is slow.
 pub fn validate_mnemonic(mnemonic: &str) -> Result<(), Error> {
-    bip39::Mnemonic::parse_normalized(mnemonic)
-        .map(drop)
+    parse_mnemonic(mnemonic).map(drop)
+}
+
+fn parse_mnemonic(mnemonic: &str) -> Result<bip39::Mnemonic, Error> {
+    bip39::Mnemonic::parse_normalized(&nfkd(mnemonic))
         .map_err(|e| Error::InvalidMnemonic(e.to_string()))
+}
+
+/// bip39's own normalizing calls leave an unwiped copy of non-ASCII input, so normalize into a wiped one here.
+fn nfkd(s: &str) -> Zeroizing<String> {
+    Zeroizing::new(s.nfkd().collect())
 }
 
 /// A fresh 12-word mnemonic from the OS random source.
@@ -167,5 +175,26 @@ mod tests {
         assert!(!printed.contains(&keys.nullifying_key.to_string()));
         assert!(!printed.contains("1, 1, 1"));
         assert!(!printed.contains("2, 2, 2"));
+    }
+
+    const MNEMONIC: &str = "test test test test test test test test test test test junk";
+
+    #[test]
+    fn normalizes_the_password_like_the_engine() {
+        // Engine 9.6.0 `Mnemonic.toSeed(MNEMONIC, "café")`, for both the composed and the decomposed é.
+        let engine = "78e6738c3ed36181739985c3f7f298f206c3ba6ae695289c4b443266e312023563ef3a1eb73fbf90e5ae3a59e6f4cf8dbcabe389d3c8127bc9ea6ceca87a7efd";
+        for password in ["caf\u{e9}", "cafe\u{301}"] {
+            let seed = mnemonic_to_seed(MNEMONIC, password).unwrap();
+            let hex: String = seed.iter().map(|b| format!("{b:02x}")).collect();
+            assert_eq!(hex, engine);
+        }
+    }
+
+    #[test]
+    fn rejects_a_bad_checksum() {
+        let bad = "test test test test test test test test test test test test";
+        assert!(validate_mnemonic(MNEMONIC).is_ok());
+        assert!(validate_mnemonic(bad).is_err());
+        assert!(mnemonic_to_seed(bad, "").is_err());
     }
 }

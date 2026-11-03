@@ -1,6 +1,6 @@
 # railgun.rs
 
-A Rust core for a private Railgun wallet, library first. `README.md` has the overview and open items, `docs/architecture.md` the design, `docs/protocol.md` the byte formats and `docs/development.md` the tests, harness, live runs and measurements.
+A Rust core for a private Railgun wallet, library first. `README.md` has the overview and open items, `docs/architecture.md` the design, `docs/protocol.md` the byte formats, `docs/engine-differences.md` where it departs from the TS engine and `docs/development.md` the tests, harness, live runs and measurements.
 
 ## Task Authority
 

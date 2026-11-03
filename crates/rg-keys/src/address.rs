@@ -84,8 +84,11 @@ pub fn decode_address(address: &str) -> Result<AddressData, Error> {
     if version != ADDRESS_VERSION {
         return Err(Error::AddressVersion(version));
     }
-    // The engine reads the mpk as a raw 256-bit integer; we reduce it into the field.
+    // The engine reads any 256-bit integer here, but a real MPK is a Poseidon output, so one at or above the modulus is not an address anyone can spend from.
     let master_public_key = field::from_be_bytes_mod_order(&payload[1..33]);
+    if field::to_be_bytes(&master_public_key) != payload[1..33] {
+        return Err(Error::InvalidAddress("master public key out of range"));
+    }
     let mut net = [0u8; 8];
     net.copy_from_slice(&payload[33..41]);
     let net = xor_network_id(net);

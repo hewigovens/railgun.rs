@@ -51,7 +51,8 @@ spendable.
 | `rg-core` | `Client`: store, sync, scan, transfers, unshields, POI, sending |
 | `rg-uniffi` | Swift and Kotlin bindings over `rg-core` |
 
-`docs/architecture.md` has the flows, and `docs/protocol.md` the byte formats.
+`docs/architecture.md` has the flows, `docs/protocol.md` the byte formats, and
+`docs/engine-differences.md` where this library differs from the TS engine.
 
 ## Use from Rust
 
@@ -106,7 +107,7 @@ again on every load.
 
 ## Not supported yet
 
-- Spending notes from more than one tree in one transfer.
+- Spending notes from more than one tree, or more than 10 notes, in one transfer.
 - Native ETH: shielding it, or unshielding to it, needs the relay adapt contract.
 - Broadcasters, so for now a public account pays gas and shows on chain.
 - NFTs.
@@ -114,32 +115,6 @@ again on every load.
   scan them.
 - A view-only wallet.
 - Running inside a real Android app, and timings on real phones.
-
-## Known differences from the TS engine
-
-- `mnemonic_to_seed` checks the BIP39 checksum; the engine does not.
-- `AddressData.master_public_key` is a field element, so an address whose MPK is at or
-  above the BN254 modulus decodes to the reduced value. A real MPK is a Poseidon output
-  and never hits this; one engine test vector does, and the test notes it.
-- `babyjubjub::Point::mul_le` is variable time and only used for public scalars
-  (verification). Key derivation and signing use `mul_ct`, a Montgomery ladder that runs
-  the same field operations for every scalar. arkworks' field arithmetic underneath is
-  not audited for constant time.
-- `ed25519::shared_key` accepts a non-canonical y encoding, as the engine's wasm path
-  (curve25519-dalek) does; blinding and unblinding reject it, as noble-ed25519 does.
-- `wallet_source::encode` rejects sources over 16 characters; the engine only enforces
-  that when a wallet source is set, not when encoding.
-- `memo::decrypt_annotation` returns none for annotation data under 32 bytes, where the
-  engine would return truncated fields.
-- `rg_wallet` drops a shield note whose note public key is not
-  `poseidon(ourMPK, random)`; the engine keeps any shield whose random decrypts. Such a
-  note could not be spent.
-- `rg_tx::select_notes` spends from one tree, up to 10 notes.
-- History is simpler than the SDK's: shields, receipts, sends and unshields per token and
-  transaction. Change and transfers to yourself are left out, and an unshield's value is
-  what it took from the wallet, before the contract's fee.
-- `rg_prover::Circuit::prove` checks the witness length against the zkey's variable
-  count; ark-circom's matrices count one witness variable too many.
 
 ## Development
 
