@@ -9,6 +9,7 @@ mod hashing;
 mod params;
 mod plan;
 mod prepared;
+mod relay_adapt;
 mod shield;
 mod unshield;
 
@@ -21,5 +22,9 @@ pub use plan::{
     MAX_INPUTS, TransferRequest, UnshieldRequest, plan_transfer, plan_unshield, select_notes,
 };
 pub use prepared::Prepared;
+pub use relay_adapt::{
+    AdaptId, relay_adapt_params, relay_calldata, shield_base_token_calldata,
+    unshield_base_token_action,
+};
 pub use shield::{approve_calldata, shield_calldata};
 pub use unshield::UnshieldOutput;

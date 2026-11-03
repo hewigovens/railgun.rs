@@ -146,15 +146,14 @@ impl<S: ChainStore> Client<S> {
             data: Vec::new(),
         };
         for tx in &txs {
-            let (blinded, data) =
-                self.prove_railgun_transaction(keys, &scan, tx, &txids, artifacts, size)?;
-            proof.blinded.extend(blinded);
-            proof.data.push(data);
+            let one = self.prove_railgun_transaction(keys, &scan, tx, &txids, artifacts, size)?;
+            proof.blinded.extend(one.blinded);
+            proof.data.extend(one.data);
         }
         Ok(proof)
     }
 
-    /// The POI proof for one Railgun transaction: its blinded outputs and its `TransactProofData`.
+    /// The POI proof for one Railgun transaction.
     fn prove_railgun_transaction(
         &self,
         keys: &WalletKeys,
@@ -163,7 +162,7 @@ impl<S: ChainStore> Client<S> {
         txids: &Txids,
         artifacts: &Artifacts,
         size: Option<usize>,
-    ) -> Result<(Vec<(String, &'static str)>, Value), Error> {
+    ) -> Result<PoiProof, Error> {
         let unprovable = |why| Error::NotProvable(hex::encode(tx.transaction_hash), why);
         let tx_leaf = leaf(tx);
         let index = txids
@@ -262,7 +261,10 @@ impl<S: ChainStore> Client<S> {
             .map(|b| (b, "Transact"))
             .chain(unshield.map(|b| (b, "Unshield")))
             .collect();
-        Ok((blinded, data))
+        Ok(PoiProof {
+            blinded,
+            data: vec![data],
+        })
     }
 
     /// Submits each Railgun transaction's proof.

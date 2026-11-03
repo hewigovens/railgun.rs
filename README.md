@@ -21,8 +21,11 @@ example is a command line over the API.
   sends and unshields.
 - Balances split by POI status (spendable, shield pending, missing POI and so on), from
   the POI aggregator.
-- Private transfers and unshields, with several inputs from one tree, proved in Rust.
-  They spend only notes whose POI is valid, as the TS SDK does.
+- Private transfers and unshields, proved in Rust. Notes from several trees, or more than
+  10, are split into several Railgun transactions in one call. They spend only notes whose
+  POI is valid, as the TS SDK does.
+- Native ETH: shielding it, and unshielding to it, through the RelayAdapt contract.
+- View-only wallets from a shareable viewing key, in the engine's format.
 - POI proofs, submitted to the aggregator, so recipients can spend what they receive.
 - Shielding ERC-20 tokens, fee quotes, and EIP-1559 signing and sending.
 - Checks for mnemonics, 0zk addresses and EIP-55 checksummed `0x` addresses.
@@ -82,7 +85,7 @@ the first time a proof needs them. After a transfer is mined, `client.prove_poi`
 `client.submit_poi` give it POI.
 
 `crates/rg-core/examples/wallet.rs` covers `sync`, `balance`, `history`, `transfer`,
-`unshield`, `shield`, `estimate`, `send` and `poi`:
+`unshield`, `unshield-eth`, `shield`, `shield-eth`, `estimate`, `send` and `poi`:
 
 ```sh
 cargo run --release -p rg-core --example wallet -- arbitrum <rpc url> <data dir> <mnemonic file> balance
@@ -107,13 +110,10 @@ again on every load.
 
 ## Not supported yet
 
-- Spending notes from more than one tree, or more than 10 notes, in one transfer.
-- Native ETH: shielding it, or unshielding to it, needs the relay adapt contract.
 - Broadcasters, so for now a public account pays gas and shows on chain.
 - NFTs.
 - Legacy (pre-2023) events, so a wallet with notes from before the squid seed cannot
   scan them.
-- A view-only wallet.
 - Running inside a real Android app, and timings on real phones.
 
 ## Development

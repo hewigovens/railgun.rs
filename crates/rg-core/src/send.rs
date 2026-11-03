@@ -1,11 +1,11 @@
 use rand::RngCore;
 use rg_keys::{EvmAddress, EvmKey, decode_address};
 use rg_sync::rpc::Receipt;
-use rg_tx::{Eip1559Tx, approve_calldata, shield_calldata};
+use rg_tx::{Eip1559Tx, approve_calldata, shield_base_token_calldata, shield_calldata};
 
 use crate::{ChainStore, Client, Error, FeeQuote, UnsignedTx};
 
-fn address(value: &str) -> Result<[u8; 20], Error> {
+pub(crate) fn address(value: &str) -> Result<[u8; 20], Error> {
     value
         .parse::<EvmAddress>()
         .map(|a| a.0)
@@ -29,6 +29,30 @@ impl<S: ChainStore> Client<S> {
         Ok(UnsignedTx {
             chain_id: self.network.chain_id,
             to: self.network.proxy.to_string(),
+            value: 0,
+            data,
+        })
+    }
+
+    /// Shields `value` wei of ETH as the wrapped token, through RelayAdapt, so it needs no approval. The contract keeps its fee, so `receiver` gets slightly less.
+    pub fn build_shield_base_token(
+        &self,
+        receiver: &str,
+        value: u128,
+    ) -> Result<UnsignedTx, Error> {
+        let receiver = decode_address(receiver)?;
+        let mut rng = rand::rngs::OsRng;
+        let data = shield_base_token_calldata(
+            address(self.network.relay_adapt)?,
+            &receiver,
+            address(self.network.wrapped_token)?,
+            value,
+            |b| rng.fill_bytes(b),
+        )?;
+        Ok(UnsignedTx {
+            chain_id: self.network.chain_id,
+            to: self.network.relay_adapt.to_string(),
+            value,
             data,
         })
     }
@@ -37,6 +61,7 @@ impl<S: ChainStore> Client<S> {
         Ok(UnsignedTx {
             chain_id: self.network.chain_id,
             to: format!("0x{}", hex::encode(token)),
+            value: 0,
             data: approve_calldata(address(self.network.proxy)?, value),
         })
     }
@@ -72,6 +97,7 @@ impl<S: ChainStore> Client<S> {
             max_fee_per_gas: fee.max_fee_per_gas,
             gas_limit: fee.gas_limit,
             to: address(&tx.to)?,
+            value: tx.value,
             data: tx.data.clone(),
         }
         .sign(key)?;

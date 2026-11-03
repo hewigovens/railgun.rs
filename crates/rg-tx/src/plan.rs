@@ -2,7 +2,7 @@ use rg_keys::{AddressData, WalletKeys};
 use rg_notes::OutputType;
 use rg_notes::transact::OutputNote;
 
-use crate::{Error, OutputPlan, SpendNote, TransferParams, UnshieldOutput};
+use crate::{AdaptId, Error, OutputPlan, SpendNote, TransferParams, UnshieldOutput};
 
 /// A transfer to one recipient from a wallet scan.
 pub struct TransferRequest<'a> {
@@ -169,6 +169,7 @@ fn plan_spend<'a>(
             inputs,
             outputs: with_ivs(outs, &mut *fill),
             unshield,
+            adapt: AdaptId::default(),
         });
     }
     Ok(planned)

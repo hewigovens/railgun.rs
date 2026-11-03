@@ -26,6 +26,13 @@ engine accepts. Missing features are in the README under "Not supported yet".
 - `rg_wallet` drops a shield note whose note public key is not
   `poseidon(ourMPK, random)`; the engine keeps any shield whose random decrypts. Such a
   note could not be spent.
+- `select_notes` takes the smallest single note that covers the amount, then the fewest of
+  a tree's largest notes, and only then splits across trees or past 10 notes, filling each
+  group from the largest notes. The engine fills groups from the smallest notes up, which
+  spends dust but can need more proofs.
+- Unshielding to ETH uses the RelayAdapt contract, as engine 9.6.0 does. Wallet SDK 11.2.0
+  prefers an EIP-7702 path through an ephemeral account where a network has one; RelayAdapt
+  still works on Ethereum, Arbitrum and Sepolia.
 - History is simpler than the SDK's: shields, receipts, sends and unshields per token and
   transaction. Change and transfers to yourself are left out, and an unshield's value is
   what it took from the wallet, before the contract's fee.

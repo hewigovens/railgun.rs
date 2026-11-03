@@ -58,10 +58,17 @@ impl RpcClient {
     }
 
     /// Runs a call against the node, as the sender would. A transaction the contract would reject comes back as an error, at no cost.
-    pub fn estimate_gas(&self, from: &str, to: &str, data: &str) -> Result<u64, Error> {
+    pub fn estimate_gas(
+        &self,
+        from: &str,
+        to: &str,
+        value: u128,
+        data: &str,
+    ) -> Result<u64, Error> {
+        let value = format!("0x{value:x}");
         let v = self.call(
             "eth_estimateGas",
-            json!([{"from": from, "to": to, "data": data}]),
+            json!([{"from": from, "to": to, "value": value, "data": data}]),
         )?;
         Ok(quantity(&v, "gas estimate")? as u64)
     }

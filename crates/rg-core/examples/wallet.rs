@@ -7,9 +7,11 @@
 //!   history
 //!   transfer <recipient 0zk> <token> <value> [memo]   prints the call as JSON
 //!   unshield <to> <token> <value>                     prints the same
+//!   unshield-eth <to> <value>                         wrapped ETH out as ETH, prints the call
 //!   estimate <from> <transaction json>               prints the fee quote
 //!   send <evm key file> <transaction json>           quotes, signs, sends and waits
 //!   shield <evm key file> <token> <value>             approves if needed, then shields to this wallet
+//!   shield-eth <evm key file> <wei>                   shields ETH to this wallet as wrapped ETH
 //!
 //! An EVM key file holds one `0x` hex private key. That account pays gas and is public.
 //!   poi <tx hash> [--submit | --full]
@@ -19,7 +21,8 @@
 use std::path::Path;
 
 use rg_core::{
-    Artifacts, ChainStore, Client, FileStore, Receipt, Shield, Transfer, Unshield, UnsignedTx,
+    Artifacts, ChainStore, Client, FileStore, Receipt, Shield, Transfer, Unshield,
+    UnshieldBaseToken, UnsignedTx,
 };
 use rg_keys::{EvmAddress, EvmKey, WalletKeys, Zeroizing};
 use rg_sync::Network;
@@ -63,6 +66,7 @@ fn read_tx(path: &str, chain_id: u64) -> Result<UnsignedTx, Box<dyn std::error::
     Ok(UnsignedTx {
         chain_id,
         to: tx["to"].as_str().ok_or("no to")?.to_string(),
+        value: tx["value"].as_str().unwrap_or("0").parse()?,
         data: hex::decode(data.trim_start_matches("0x"))?,
     })
 }
@@ -120,7 +124,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let print_tx = |tx: &UnsignedTx| {
         println!(
             "{}",
-            serde_json::json!({"label": "transact", "to": tx.to, "value": "0", "data": tx.data_hex()})
+            serde_json::json!({"label": "transact", "to": tx.to, "value": tx.value.to_string(), "data": tx.data_hex()})
         );
     };
 
@@ -167,6 +171,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 value,
             };
             send_and_wait(&client, &key, &client.build_shield(&shield)?)?;
+        }
+        "unshield-eth" => {
+            let unshield = UnshieldBaseToken {
+                to: address(&a[6])?,
+                value: a[7].parse()?,
+            };
+            print_tx(&client.build_unshield_base_token(&keys, &unshield, &artifacts)?);
+        }
+        "shield-eth" => {
+            // shield-eth <evm-key-file> <wei>, to this wallet; needs no approval.
+            let tx = client.build_shield_base_token(&keys.address()?, a[7].parse()?)?;
+            send_and_wait(&client, &evm_key(&a[6])?, &tx)?;
         }
         "send" => {
             // send <evm-key-file> <tx.jsonl>, from `transfer` or `unshield`.

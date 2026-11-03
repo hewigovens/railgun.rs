@@ -11,14 +11,27 @@ use rg_sync::abi;
 use crate::Error;
 
 /// `proxy.shield([...])` for `value` of `token`, payable to `receiver`. The caller must have approved the proxy for `value`. `fill` supplies randomness.
-///
-/// The SDK derives the shield key from a wallet signature so the shielder can find its own shield later. The receiver does not need it, so here it is random.
 pub fn shield_calldata(
     receiver: &AddressData,
     token: [u8; 20],
     value: u128,
-    mut fill: impl FnMut(&mut [u8]),
+    fill: impl FnMut(&mut [u8]),
 ) -> Result<Vec<u8>, Error> {
+    Ok(abi::shieldCall {
+        _shieldRequests: vec![shield_request(receiver, token, value, fill)?],
+    }
+    .abi_encode())
+}
+
+/// One shield of `value` of `token` to `receiver`.
+///
+/// The SDK derives the shield key from a wallet signature so the shielder can find its own shield later. The receiver does not need it, so here it is random.
+pub(crate) fn shield_request(
+    receiver: &AddressData,
+    token: [u8; 20],
+    value: u128,
+    mut fill: impl FnMut(&mut [u8]),
+) -> Result<abi::ShieldRequest, Error> {
     let (mut shield_key, mut random, mut gcm_iv, mut ctr_iv) =
         ([0u8; 32], [0u8; 16], [0u8; 16], [0u8; 16]);
     fill(&mut shield_key);
@@ -34,7 +47,7 @@ pub fn shield_calldata(
         &gcm_iv,
         &ctr_iv,
     )?;
-    let request = abi::ShieldRequest {
+    Ok(abi::ShieldRequest {
         preimage: abi::CommitmentPreimage {
             npk: B256::from(to_be_bytes(&npk)),
             token: abi::TokenData {
@@ -48,11 +61,7 @@ pub fn shield_calldata(
             encryptedBundle: cipher.encrypted_bundle.map(FixedBytes::from),
             shieldKey: B256::from(cipher.shield_key),
         },
-    };
-    Ok(abi::shieldCall {
-        _shieldRequests: vec![request],
-    }
-    .abi_encode())
+    })
 }
 
 /// `token.approve(spender, value)`.

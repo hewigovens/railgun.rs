@@ -89,6 +89,8 @@ $W history
 $W shield <evm-key-file> $WETH <value>   # approves if needed, then shields to this wallet
 $W transfer $RECIPIENT $WETH <value> > transfer.jsonl
 $W unshield <to> $WETH <value> > transfer.jsonl   # instead of transfer
+$W unshield-eth <to> <value> > transfer.jsonl     # arrives as ETH, through RelayAdapt
+$W shield-eth <evm-key-file> <wei>          # ETH in as WETH, no approval
 $W estimate <from> transfer.jsonl         # fee quote
 $W send <evm-key-file> transfer.jsonl
 $W sync

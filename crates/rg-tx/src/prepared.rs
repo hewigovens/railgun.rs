@@ -30,6 +30,14 @@ pub struct Prepared {
 }
 
 impl TransferParams<'_> {
+    /// The nullifiers this transaction will publish, known before proving, so adapt params can commit to them.
+    pub fn nullifiers(&self, nullifying_key: &Fr) -> Vec<Fr> {
+        self.inputs
+            .iter()
+            .map(|i| note::nullifier(nullifying_key, i.position))
+            .collect()
+    }
+
     pub fn prepare(&self, keys: &WalletKeys) -> Result<Prepared, Error> {
         let p = self;
         let (ni, no) = (p.inputs.len(), p.outputs.len() + p.unshield.iter().len());
@@ -47,11 +55,7 @@ impl TransferParams<'_> {
                 return Err(Error::BadProof);
             }
         }
-        let nullifiers: Vec<Fr> = p
-            .inputs
-            .iter()
-            .map(|i| note::nullifier(&keys.nullifying_key, i.position))
-            .collect();
+        let nullifiers = p.nullifiers(&keys.nullifying_key);
         let mut commitments: Vec<Fr> = p.outputs.iter().map(|o| o.note.commitment()).collect();
         commitments.extend(p.unshield.iter().map(UnshieldOutput::commitment));
 
@@ -76,8 +80,8 @@ impl TransferParams<'_> {
             minGasPrice: alloy_primitives::Uint::from(p.min_gas_price),
             unshield: u8::from(p.unshield.is_some()),
             chainID: p.chain_id,
-            adaptContract: Address::ZERO,
-            adaptParams: B256::ZERO,
+            adaptContract: Address::from(p.adapt.contract),
+            adaptParams: B256::from(p.adapt.parameters),
             commitmentCiphertext: ciphertexts,
         };
         let bound_params_hash = hash_bound_params(&bound_params);

@@ -120,4 +120,34 @@ sol! {
     function allowance(address owner, address spender) external view returns (uint256);
 
     function balanceOf(address owner) external view returns (uint256);
+
+    // RelayAdapt.
+    struct Call {
+        address to;
+        bytes data;
+        uint256 value;
+    }
+
+    struct ActionData {
+        bytes31 random;
+        bool requireSuccess;
+        uint256 minGasLimit;
+        Call[] calls;
+    }
+
+    struct TokenTransfer {
+        TokenData token;
+        address to;
+        uint256 value;
+    }
+
+    function multicall(bool _requireSuccess, Call[] _calls) external payable;
+
+    function relay(Transaction[] _transactions, ActionData _actionData) external payable;
+
+    function wrapBase(uint256 _amount) external;
+
+    function unwrapBase(uint256 _amount) external;
+
+    function transfer(TokenTransfer[] _transfers) external;
 }

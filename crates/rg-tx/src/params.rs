@@ -2,7 +2,7 @@ use rg_notes::transact::OutputNote;
 use rg_primitives::Fr;
 use rg_tree::MerkleProof;
 
-use crate::UnshieldOutput;
+use crate::{AdaptId, UnshieldOutput};
 
 /// A note being spent, with its proof against the root the transfer uses.
 #[derive(Clone, Debug)]
@@ -32,6 +32,7 @@ pub struct TransferParams<'a> {
     pub inputs: Vec<SpendNote>,
     pub outputs: Vec<OutputPlan<'a>>,
     pub unshield: Option<UnshieldOutput>,
+    pub adapt: AdaptId,
 }
 
 /// Circuits Railgun deploys (nullifiers x commitments): every shape of at most 14 signals. Checked against the published hashes in `rg-core`, and the Arbitrum contract has no key for 10x5.

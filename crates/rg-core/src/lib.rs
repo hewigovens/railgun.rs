@@ -23,4 +23,4 @@ pub use rg_wallet::{HistoryEntry, HistoryKind};
 pub use send::Shield;
 pub use store::{ChainStore, FileStore};
 pub use sync::SyncReport;
-pub use transfer::{Transfer, Unshield, UnsignedTx};
+pub use transfer::{Transfer, Unshield, UnshieldBaseToken, UnsignedTx};

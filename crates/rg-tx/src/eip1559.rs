@@ -6,7 +6,7 @@ use crate::Error;
 
 const TX_TYPE: u8 = 2;
 
-/// An EIP-1559 call that moves no native value.
+/// An EIP-1559 call. `value` is the wei it sends along.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Eip1559Tx {
     pub chain_id: u64,
@@ -15,6 +15,7 @@ pub struct Eip1559Tx {
     pub max_fee_per_gas: u128,
     pub gas_limit: u64,
     pub to: [u8; 20],
+    pub value: u128,
     pub data: Vec<u8>,
 }
 
@@ -38,7 +39,7 @@ impl Eip1559Tx {
         self.max_fee_per_gas.encode(&mut out);
         self.gas_limit.encode(&mut out);
         self.to.encode(&mut out);
-        0u8.encode(&mut out);
+        self.value.encode(&mut out);
         self.data.as_slice().encode(&mut out);
         Header {
             list: true,
@@ -91,7 +92,7 @@ mod tests {
     fn signs_the_same_bytes_as_ethers() {
         let key = EvmKey::from_bytes(&[0x11; 32]).unwrap();
         let approve = crate::approve_calldata(RAILGUN, 100);
-        let cases: [(Eip1559Tx, &str); 3] = [
+        let cases: [(Eip1559Tx, &str); 4] = [
             (
                 Eip1559Tx {
                     chain_id: 42_161,
@@ -100,6 +101,7 @@ mod tests {
                     max_fee_per_gas: 20_000_000,
                     gas_limit: 1_200_000,
                     to: RAILGUN,
+                    value: 0,
                     data: vec![],
                 },
                 "34ed64a70586d3bc8ea3d6b41de7f2aca70c55974c6c4bc4511ac4ae5e8894e8",
@@ -112,6 +114,7 @@ mod tests {
                     max_fee_per_gas: 40_000_000,
                     gas_limit: 61_234,
                     to: WETH,
+                    value: 0,
                     data: approve,
                 },
                 "e9c1115ab852a5ae4fd5831152de8cab0197614887758b86da18bdf273c2a97e",
@@ -124,9 +127,23 @@ mod tests {
                     max_fee_per_gas: 90_000_000_000,
                     gas_limit: 1_000_000,
                     to: RAILGUN,
+                    value: 0,
                     data: vec![0xab; 300],
                 },
                 "126a96b7111bdf6d9ecb653be0fcd9fd6eaaa0405b0d300e5089da602134553d",
+            ),
+            (
+                Eip1559Tx {
+                    chain_id: 42_161,
+                    nonce: 3,
+                    max_priority_fee_per_gas: 0,
+                    max_fee_per_gas: 20_000_000,
+                    gas_limit: 900_000,
+                    to: alloy_primitives::hex!("B4F2d77bD12c6b548Ae398244d7FAD4ABCE4D89b"),
+                    value: 1_000_000_000_000_000,
+                    data: vec![0x12, 0x34],
+                },
+                "536a28b63747f1f6c7d2935d1cdfe0f19c9ed0773ee3fabba6599b004795cac5",
             ),
         ];
         for (tx, hash) in cases {
@@ -143,6 +160,7 @@ mod tests {
             max_fee_per_gas: 1,
             gas_limit: 21_000,
             to: RAILGUN,
+            value: 0,
             data: vec![],
         };
         let mut r = [0u8; 32];

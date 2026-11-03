@@ -128,6 +128,18 @@ An unshield is the same flow with one more output: a commitment whose npk is the
 address, last in the list, with no ciphertext and no tree position. The contract pays it
 out, less its fee, and the POI proof carries the Railgun txid in place of a blinded note.
 
+A transaction proves against one tree's root and takes at most 10 notes. When the notes
+that cover an amount span trees, or there are more than 10, `select_notes` groups them and
+each group becomes its own Railgun transaction in the same `transact` call. Every group
+pays the recipient, or the unshield, its share, and the last one carries the change. POI
+is proved and submitted per Railgun transaction.
+
+Native ETH goes through the RelayAdapt contract. A shield is `multicall(wrapBase, shield)`
+sent with the ETH, so it needs no approval. An unshield to ETH unshields the wrapped token
+to RelayAdapt, and the bound params commit to RelayAdapt and to a hash of the nullifiers
+and the follow-up calls, `unwrapBase` and a transfer of the ETH to the recipient. The
+nullifiers are known before proving, so no dummy proof is needed to make that hash.
+
 The contract never sees amounts, owners or the token of a private transfer. It learns that a
 valid proof spent some unspent notes under a known root.
 
@@ -173,6 +185,7 @@ The core never stores a key. `FileStore` holds chain data only, and a shell keep
 | --- | --- |
 | Spending and viewing keys | `PrivateKey`: not `Copy`, never printed, wiped on drop. Only `expose()` reads them. |
 | `WalletKeys` | Not `Clone`, wiped on drop, and `Debug` shows only the master public key. `Wallet` drops it on Kotlin's `close()` or Swift's last release. |
+| `ViewOnlyKeys` and the shareable viewing key | The viewing key, nullifying key and public keys, wiped on drop. `WalletKeys` holds one and derefs to it, so scanning, balances and history take either. The shareable key reveals every note and transaction, so it crosses as bytes and is returned as `Zeroizing`. |
 | Seed, BIP32 nodes, BIP39 entropy and words | Wiped on drop. |
 | `EvmKey`, the gas account | k256 `SigningKey`, wiped on drop, `Debug` shows only the address. |
 | EdDSA and Ed25519 working values, including the signing nonce | Wiped when the call returns. |

@@ -1,13 +1,15 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
-use rg_core::{Artifacts, Client, FileStore, Receipt, Shield, Transfer, Unshield, UnsignedTx};
+use rg_core::{
+    Artifacts, Client, FileStore, Receipt, Shield, Transfer, Unshield, UnshieldBaseToken,
+};
 use rg_keys::EvmAddress;
 use rg_sync::Network;
 
 use crate::{
     EvmAccount, FeeQuote, HistoryItem, PoiSubmission, RailgunError, SyncReport, TokenBalance,
-    Wallet,
+    UnsignedTx, Wallet,
 };
 
 fn hash(value: &str) -> Result<[u8; 32], RailgunError> {
@@ -21,7 +23,7 @@ fn address(value: &str) -> Result<[u8; 20], RailgunError> {
     Ok(value.parse::<EvmAddress>()?.0)
 }
 
-fn amount(value: &str) -> Result<u128, RailgunError> {
+pub(crate) fn amount(value: &str) -> Result<u128, RailgunError> {
     value
         .parse()
         .map_err(|_| RailgunError::invalid(format!("not an amount: {value}")))
@@ -89,9 +91,10 @@ impl RailgunClient {
             value: amount(&value)?,
             memo: memo.as_deref(),
         };
-        Ok(self
+        let tx = self
             .client()
-            .build_transfer(wallet.spending()?, &transfer, &self.artifacts)?)
+            .build_transfer(wallet.spending()?, &transfer, &self.artifacts)?;
+        Ok(tx.into())
     }
 
     pub fn build_unshield(
@@ -106,9 +109,41 @@ impl RailgunClient {
             token: address(&token)?,
             value: amount(&value)?,
         };
-        Ok(self
+        let tx = self
             .client()
-            .build_unshield(wallet.spending()?, &unshield, &self.artifacts)?)
+            .build_unshield(wallet.spending()?, &unshield, &self.artifacts)?;
+        Ok(tx.into())
+    }
+
+    /// Unshields wrapped ETH so that `to` receives ETH, through RelayAdapt. The contract keeps its fee.
+    pub fn build_unshield_base_token(
+        &self,
+        wallet: &Wallet,
+        to: String,
+        value: String,
+    ) -> Result<UnsignedTx, RailgunError> {
+        let unshield = UnshieldBaseToken {
+            to: address(&to)?,
+            value: amount(&value)?,
+        };
+        let tx = self.client().build_unshield_base_token(
+            wallet.spending()?,
+            &unshield,
+            &self.artifacts,
+        )?;
+        Ok(tx.into())
+    }
+
+    /// Shields `value` wei of ETH to `receiver` as wrapped ETH, through RelayAdapt, with no approval. The call carries `value`, and the contract keeps its fee.
+    pub fn build_shield_base_token(
+        &self,
+        receiver: String,
+        value: String,
+    ) -> Result<UnsignedTx, RailgunError> {
+        let tx = self
+            .client()
+            .build_shield_base_token(&receiver, amount(&value)?)?;
+        Ok(tx.into())
     }
 
     /// The contract keeps its fee, so `receiver` gets slightly less than `value`. `value` needs an allowance first: see `build_approve`.
@@ -123,14 +158,15 @@ impl RailgunClient {
             token: address(&token)?,
             value: amount(&value)?,
         };
-        Ok(self.client().build_shield(&shield)?)
+        Ok(self.client().build_shield(&shield)?.into())
     }
 
     /// Lets the Railgun contract take `value` of `token`.
     pub fn build_approve(&self, token: String, value: String) -> Result<UnsignedTx, RailgunError> {
-        Ok(self
+        let tx = self
             .client()
-            .build_approve(address(&token)?, amount(&value)?)?)
+            .build_approve(address(&token)?, amount(&value)?)?;
+        Ok(tx.into())
     }
 
     /// What the Railgun contract may take of `owner`'s `token`.
@@ -154,7 +190,7 @@ impl RailgunClient {
 
     /// Estimates and prices sending `tx` from the `from` address, which needs no key. Fails if the node expects it to revert.
     pub fn quote_fee(&self, from: String, tx: UnsignedTx) -> Result<Arc<FeeQuote>, RailgunError> {
-        let quote = self.client().quote_fee(&address(&from)?, &tx)?;
+        let quote = self.client().quote_fee(&address(&from)?, &tx.try_into()?)?;
         Ok(Arc::new(FeeQuote { quote }))
     }
 
@@ -165,7 +201,9 @@ impl RailgunClient {
         tx: UnsignedTx,
         fee: &FeeQuote,
     ) -> Result<String, RailgunError> {
-        let hash = self.client().send(&account.key, &tx, &fee.quote)?;
+        let hash = self
+            .client()
+            .send(&account.key, &tx.try_into()?, &fee.quote)?;
         Ok(format!("0x{}", hex::encode(hash)))
     }
 
