@@ -41,8 +41,8 @@ class LiveSmoke private constructor(
         val fee = client.quoteFee(environment.getValue("RG_FROM"), transaction)
         println("fee: gas limit ${fee.gasLimit()}, expected ${fee.expectedCost()} wei, at most ${fee.maxCost()} wei")
 
-        val offer = RailgunBroadcasters.connect("arbitrum").bestOffer(token)
-        Check.that(offer != null, "a broadcaster takes the token")
+        val offer = RailgunBroadcasters.connect("arbitrum").bestOffer(token, true)
+        Check.that(offer != null, "a broadcaster takes the token through RelayAdapt")
         println("broadcaster: ${offer?.railgunAddress()} at ${offer?.feePerUnitGas(token)} per unit gas")
 
         environment["RG_SEND_KEY_FILE"]?.let { send(client, wallet, transaction, it) }

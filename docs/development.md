@@ -98,6 +98,7 @@ $W poi <tx hash> --submit
 $W broadcasters $WETH                     # live offers, cheapest first
 $W broadcast-transfer $RECIPIENT $WETH <value> [--send]   # prints the fee; --send hands it over
 $W broadcast-unshield <to> $WETH <value> [--send]
+$W broadcast-unshield-eth <to> <value> [--send]          # arrives as ETH, fee in WETH
 ```
 
 A broadcast needs the fee on top of the value in spendable notes of that token. Once it

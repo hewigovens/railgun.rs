@@ -47,8 +47,8 @@ struct LiveSmoke {
         let fee = try client.quoteFee(from: sender, tx: transaction)
         print("fee: gas limit \(fee.gasLimit()), expected \(fee.expectedCost()) wei, at most \(fee.maxCost()) wei")
 
-        let offer = try RailgunBroadcasters.connect(network: "arbitrum").bestOffer(token: token)
-        Check.that(offer != nil, "a broadcaster takes the token")
+        let offer = try RailgunBroadcasters.connect(network: "arbitrum").bestOffer(token: token, relayAdapt: true)
+        Check.that(offer != nil, "a broadcaster takes the token through RelayAdapt")
         if let offer {
             try print("broadcaster: \(offer.railgunAddress()) at \(offer.feePerUnitGas(token: token) ?? "none") per unit gas")
         }

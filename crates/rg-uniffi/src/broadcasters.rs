@@ -10,6 +10,7 @@ use crate::{BroadcasterOffer, RailgunError};
 #[derive(uniffi::Object)]
 pub struct RailgunBroadcasters {
     pub(crate) broadcasters: Mutex<Broadcasters>,
+    relay_adapt: [u8; 20],
 }
 
 impl RailgunBroadcasters {
@@ -27,9 +28,11 @@ impl RailgunBroadcasters {
     pub fn connect(network: String) -> Result<Arc<Self>, RailgunError> {
         let network = Network::by_name(&network)
             .ok_or_else(|| RailgunError::invalid(format!("unknown network: {network}")))?;
+        let relay_adapt = network.relay_adapt.parse::<EvmAddress>()?.0;
         let waku = Waku::railgun().map_err(rg_core::Error::from)?;
         Ok(Arc::new(RailgunBroadcasters {
             broadcasters: Mutex::new(Broadcasters::new(waku, network.chain_id)),
+            relay_adapt,
         }))
     }
 
@@ -42,12 +45,16 @@ impl RailgunBroadcasters {
             .collect())
     }
 
-    /// The cheapest live offer for `token`, if any.
-    pub fn best_offer(&self, token: String) -> Result<Option<Arc<BroadcasterOffer>>, RailgunError> {
+    /// The cheapest live offer for `token`, if any. With `relay_adapt`, only from broadcasters that submit through this network's RelayAdapt, as an unshield to ETH needs.
+    pub fn best_offer(
+        &self,
+        token: String,
+        relay_adapt: bool,
+    ) -> Result<Option<Arc<BroadcasterOffer>>, RailgunError> {
         let token = token.parse::<EvmAddress>()?.0;
         let offer = self
             .lock()
-            .best_offer(&token, POI_LIST)
+            .best_offer(&token, POI_LIST, relay_adapt.then_some(&self.relay_adapt))
             .map_err(rg_core::Error::from)?;
         Ok(offer.map(|offer| Arc::new(BroadcasterOffer { offer })))
     }

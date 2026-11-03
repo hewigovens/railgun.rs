@@ -5,12 +5,12 @@ use rg_prover::Circuit;
 use rg_prover::ark_types::{Bn254, Proof};
 use rg_sync::abi;
 use rg_tx::{
-    AdaptId, BroadcasterFee, TransferParams, TransferRequest, UnshieldRequest,
-    chain_full_network_id, plan_transfer, plan_unshield, relay_adapt_params, relay_calldata,
-    transact_calldata, unshield_base_token_action,
+    BroadcasterFee, TransferParams, TransferRequest, UnshieldRequest, chain_full_network_id,
+    plan_transfer, plan_unshield, unshield_base_token_action,
 };
 use rg_wallet::ScanResult;
 
+use crate::route::Route;
 use crate::send::address;
 use crate::{Artifacts, ChainStore, Client, Error};
 
@@ -71,7 +71,7 @@ pub(crate) fn prove(
 }
 
 /// Proves each planned transaction for the contract.
-pub(crate) fn prove_all(
+fn prove_all(
     keys: &WalletKeys,
     planned: &[TransferParams],
     artifacts: &Artifacts,
@@ -103,7 +103,7 @@ impl<S: ChainStore> Client<S> {
     ) -> Result<UnsignedTx, Error> {
         let recipient = decode_address(transfer.recipient)?;
         let params = self.plan_transfer(keys, transfer, &recipient, None, 0)?;
-        self.transact(keys, &params, artifacts)
+        self.transact(keys, &params, &Route::direct(self.network.proxy), artifacts)
     }
 
     pub(crate) fn plan_transfer<'a>(
@@ -141,7 +141,7 @@ impl<S: ChainStore> Client<S> {
         artifacts: &Artifacts,
     ) -> Result<UnsignedTx, Error> {
         let params = self.plan_unshield(keys, unshield, None, 0)?;
-        self.transact(keys, &params, artifacts)
+        self.transact(keys, &params, &Route::direct(self.network.proxy), artifacts)
     }
 
     /// Plans and proves an unshield of wrapped ETH that arrives at `to` as ETH: the transactions unshield to RelayAdapt, which unwraps it and sends it on, all in one `relay` call. The contract's fee comes out of `value`.
@@ -151,33 +151,29 @@ impl<S: ChainStore> Client<S> {
         unshield: &UnshieldBaseToken,
         artifacts: &Artifacts,
     ) -> Result<UnsignedTx, Error> {
+        let (to_relay_adapt, route) = self.base_token_route(unshield, true)?;
+        let mut params = self.plan_unshield(keys, &to_relay_adapt, None, 0)?;
+        route.bind(keys, &mut params);
+        self.transact(keys, &params, &route, artifacts)
+    }
+
+    /// The wrapped-token unshield to RelayAdapt, and the route that unwraps it and sends the ETH to `unshield.to`.
+    pub(crate) fn base_token_route(
+        &self,
+        unshield: &UnshieldBaseToken,
+        require_success: bool,
+    ) -> Result<(Unshield, Route), Error> {
         let relay_adapt = address(self.network.relay_adapt)?;
         let to_relay_adapt = Unshield {
             to: relay_adapt,
             token: address(self.network.wrapped_token)?,
             value: unshield.value,
         };
-        let mut params = self.plan_unshield(keys, &to_relay_adapt, None, 0)?;
         let mut random = [0u8; 31];
         rand::rngs::OsRng.fill_bytes(&mut random);
-        let action = unshield_base_token_action(relay_adapt, unshield.to, random);
-        let nullifiers: Vec<_> = params
-            .iter()
-            .map(|p| p.nullifiers(&keys.nullifying_key))
-            .collect();
-        let adapt = AdaptId {
-            contract: relay_adapt,
-            parameters: relay_adapt_params(&nullifiers, &action),
-        };
-        for p in &mut params {
-            p.adapt = adapt;
-        }
-        Ok(UnsignedTx {
-            chain_id: self.network.chain_id,
-            to: self.network.relay_adapt.to_string(),
-            value: 0,
-            data: relay_calldata(prove_all(keys, &params, artifacts)?, action),
-        })
+        let action = unshield_base_token_action(relay_adapt, unshield.to, random, require_success);
+        let route = Route::relay(self.network.relay_adapt, relay_adapt, action);
+        Ok((to_relay_adapt, route))
     }
 
     pub(crate) fn plan_unshield(
@@ -227,18 +223,19 @@ impl<S: ChainStore> Client<S> {
         }
     }
 
-    /// One `transact` call with every planned transaction, proved.
-    fn transact(
+    /// One call along `route` with every planned transaction, proved.
+    pub(crate) fn transact(
         &self,
         keys: &WalletKeys,
         planned: &[TransferParams],
+        route: &Route,
         artifacts: &Artifacts,
     ) -> Result<UnsignedTx, Error> {
         Ok(UnsignedTx {
             chain_id: self.network.chain_id,
-            to: self.network.proxy.to_string(),
+            to: route.to.to_string(),
             value: 0,
-            data: transact_calldata(prove_all(keys, planned, artifacts)?),
+            data: route.calldata(prove_all(keys, planned, artifacts)?),
         })
     }
 

@@ -128,6 +128,7 @@ Broadcasters (`waku-broadcaster-client` 10.0.1, shared-models 8.2.1):
 - The answer is `{result: encryptedData}` under the same key, holding `{txHash}` or `{error}`.
 - `preTransactionPOIsPerTxidLeafPerList` maps list key to txid leaf hash (64 hex digits) to `{snarkProof, txidMerkleroot, poiMerkleroots, blindedCommitmentsOut, railgunTxidIfHasUnshield}`. The leaf is `poseidon(txid, treeIn, P)` with P = 199999 × 65536 + 199999, the txid proof is `createDummyMerkleProof` (index 0, sixteen zero siblings), and output i is blinded at P + i.
 - The fee note is the first output of the first transaction, type `BroadcasterFee`, sender hidden.
+- Through RelayAdapt, `to` is the RelayAdapt contract, `data` is `relay(transactions, action)` and `useRelayAdapt` is true. Broadcasters refuse an action with `requireSuccess` set. The client only picks offers whose `relayAdapt` is in the network's `relayAdaptHistory`.
 
 ## Where bytes went wrong most easily
 

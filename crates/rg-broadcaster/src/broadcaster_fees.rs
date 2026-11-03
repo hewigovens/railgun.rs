@@ -27,7 +27,8 @@ pub struct BroadcasterFees {
     pub fees_id: String,
     pub available_wallets: u32,
     pub version: String,
-    pub relay_adapt: Option<String>,
+    /// The RelayAdapt contract it submits ETH unshields and other relayed calls to.
+    pub relay_adapt: Option<[u8; 20]>,
     /// POI lists the broadcaster requires proofs for.
     pub required_poi_list_keys: Vec<String>,
     pub reliability: f64,
@@ -63,7 +64,7 @@ fn parse_version(v: &str) -> Option<[u32; 3]> {
     parts.next().is_none().then_some(version)
 }
 
-fn token(address: &str) -> Option<[u8; 20]> {
+fn evm_address(address: &str) -> Option<[u8; 20]> {
     hex::decode(address.strip_prefix("0x")?)
         .ok()?
         .try_into()
@@ -98,7 +99,7 @@ impl BroadcasterFees {
         let fees = data
             .fees
             .iter()
-            .map(|(t, f)| Some((token(t)?, fee(f)?)))
+            .map(|(t, f)| Some((evm_address(t)?, fee(f)?)))
             .collect::<Option<_>>()
             .ok_or(bad("unexpected fee entry"))?;
         Ok(BroadcasterFees {
@@ -110,7 +111,7 @@ impl BroadcasterFees {
             fees_id: data.fees_id,
             available_wallets: data.available_wallets,
             version: data.version,
-            relay_adapt: data.relay_adapt,
+            relay_adapt: data.relay_adapt.as_deref().and_then(evm_address),
             required_poi_list_keys: data.required_poi_list_keys,
             reliability: data.reliability,
         })
@@ -128,17 +129,19 @@ impl BroadcasterFees {
     }
 }
 
-/// The cheapest live offer for `token` that needs no POI list but `poi_list`, the more reliable on a tie (`findBestBroadcaster`).
+/// The cheapest live offer for `token` that needs no POI list but `poi_list`, the more reliable on a tie (`findBestBroadcaster`). With `relay_adapt`, only broadcasters that submit through that RelayAdapt contract.
 pub fn best_offer<'a>(
     offers: &'a [BroadcasterFees],
     token: &[u8; 20],
     now_ms: u64,
     poi_list: &str,
+    relay_adapt: Option<&[u8; 20]>,
 ) -> Option<&'a BroadcasterFees> {
     offers
         .iter()
         .filter(|o| o.is_live(now_ms) && o.fees.contains_key(token))
         .filter(|o| o.required_poi_list_keys.iter().all(|k| k == poi_list))
+        .filter(|o| relay_adapt.is_none_or(|r| o.relay_adapt.as_ref() == Some(r)))
         .min_by(|a, b| {
             a.fees[token]
                 .cmp(&b.fees[token])
@@ -204,15 +207,23 @@ mod tests {
         other_list.required_poi_list_keys = vec!["ab".into()];
         let mut busy = with_fee(1, 1.0);
         busy.available_wallets = 0;
+        let mut other_relay_adapt = with_fee(2, 1.0);
+        other_relay_adapt.relay_adapt = Some([1; 20]);
         let offers = [
             with_fee(5, 0.9),
             with_fee(3, 0.5),
             with_fee(3, 0.8),
             other_list,
             busy,
+            other_relay_adapt,
         ];
-        let best = best_offer(&offers, &WETH, now, list).unwrap();
+        let relay_adapt = offer.relay_adapt.unwrap();
+        let best = best_offer(&offers, &WETH, now, list, Some(&relay_adapt)).unwrap();
         assert_eq!((best.fees[&WETH], best.reliability), (3, 0.8));
-        assert!(best_offer(&offers, &[0; 20], now, list).is_none());
+        assert_eq!(
+            best_offer(&offers, &WETH, now, list, None).unwrap().fees[&WETH],
+            2
+        );
+        assert!(best_offer(&offers, &[0; 20], now, list, None).is_none());
     }
 }

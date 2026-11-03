@@ -49,11 +49,12 @@ pub fn shield_base_token_calldata(
     .abi_encode())
 }
 
-/// What the RelayAdapt contract does once the transactions have unshielded the wrapped token to it: unwrap all of it, then send all its ETH to `to` (`getOrderedCallsForUnshieldBaseToken`). Calls must succeed, as when the sender pays gas from a public wallet.
+/// What the RelayAdapt contract does once the transactions have unshielded the wrapped token to it: unwrap all of it, then send all its ETH to `to` (`getOrderedCallsForUnshieldBaseToken`). Broadcasters refuse a relay whose calls must succeed, so the engine requires success only when the sender pays gas from a public wallet.
 pub fn unshield_base_token_action(
     relay_adapt: [u8; 20],
     to: [u8; 20],
     random: [u8; 31],
+    require_success: bool,
 ) -> abi::ActionData {
     let unwrap = abi::unwrapBaseCall {
         _amount: U256::ZERO,
@@ -71,7 +72,7 @@ pub fn unshield_base_token_action(
     };
     abi::ActionData {
         random: FixedBytes::from(random),
-        requireSuccess: true,
+        requireSuccess: require_success,
         minGasLimit: U256::ZERO,
         calls: vec![
             call(relay_adapt, unwrap.abi_encode()),
@@ -107,7 +108,7 @@ mod tests {
     #[test]
     fn adapt_params_match_the_engine() {
         let relay = alloy_primitives::hex!("B4F2d77bD12c6b548Ae398244d7FAD4ABCE4D89b");
-        let action = unshield_base_token_action(relay, [0x11; 20], [0xab; 31]);
+        let action = unshield_base_token_action(relay, [0x11; 20], [0xab; 31], true);
         let n = |b: u8| rg_primitives::field::from_be_bytes_mod_order(&[b; 32]);
         let params = relay_adapt_params(&[vec![n(1), n(2)], vec![n(3)]], &action);
         assert_eq!(

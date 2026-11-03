@@ -51,10 +51,11 @@ impl Broadcasters {
         &mut self,
         token: &[u8; 20],
         poi_list: &str,
+        relay_adapt: Option<&[u8; 20]>,
     ) -> Result<Option<BroadcasterFees>, Error> {
         let offers = self.offers()?;
         let now_ms = (now_ns() / 1_000_000) as u64;
-        Ok(best_offer(&offers, token, now_ms, poi_list).cloned())
+        Ok(best_offer(&offers, token, now_ms, poi_list, relay_adapt).cloned())
     }
 
     /// Sends the request and waits up to `timeout` for the broadcaster's answer.

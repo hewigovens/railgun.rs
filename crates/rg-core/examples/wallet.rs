@@ -15,7 +15,7 @@
 //!   broadcasters <token>                              live offers for the token, cheapest first
 //!   broadcast-transfer <recipient 0zk> <token> <value> [--send]
 //!   broadcast-unshield <to> <token> <value> [--send]  through the cheapest broadcaster, which pays gas:
-//!                                                     proves and prints the fee, and with --send hands it over
+//!   broadcast-unshield-eth <to> <value> [--send]      proves and prints the fee, and with --send hands it over
 //!
 //! An EVM key file holds one `0x` hex private key. That account pays gas and is public.
 //!   poi <tx hash> [--submit | --full]
@@ -113,17 +113,23 @@ fn now_ms() -> u64 {
         .map_or(0, |d| d.as_millis() as u64)
 }
 
-/// `broadcasters`, `broadcast-transfer` and `broadcast-unshield`.
+/// `broadcasters`, `broadcast-transfer`, `broadcast-unshield` and `broadcast-unshield-eth`.
 fn broadcast_command<S: ChainStore>(
     client: &Client<S>,
     keys: &WalletKeys,
     artifacts: &Artifacts,
     a: &[String],
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let chain_id = Network::by_name(&a[1]).ok_or("unknown network")?.chain_id;
-    let mut broadcasters = Broadcasters::new(Waku::railgun()?, chain_id);
-    let at = if a[5] == "broadcasters" { 6 } else { 7 };
-    let token = a[at].parse::<EvmAddress>()?.0;
+    let network = Network::by_name(&a[1]).ok_or("unknown network")?;
+    let mut broadcasters = Broadcasters::new(Waku::railgun()?, network.chain_id);
+    let eth = a[5] == "broadcast-unshield-eth";
+    let token = match a[5].as_str() {
+        "broadcasters" => &a[6],
+        "broadcast-unshield-eth" => network.wrapped_token,
+        _ => &a[7],
+    }
+    .parse::<EvmAddress>()?
+    .0;
     if a[5] == "broadcasters" {
         let mut live: Vec<BroadcasterFees> = broadcasters
             .offers()?
@@ -140,10 +146,17 @@ fn broadcast_command<S: ChainStore>(
         }
         return Ok(());
     }
+    let relay_adapt = network.relay_adapt.parse::<EvmAddress>()?.0;
     let offer = broadcasters
-        .best_offer(&token, POI_LIST)?
+        .best_offer(&token, POI_LIST, eth.then_some(&relay_adapt))?
         .ok_or("no live broadcaster takes this token")?;
-    let tx = if a[5] == "broadcast-transfer" {
+    let tx = if eth {
+        let unshield = UnshieldBaseToken {
+            to: a[6].parse::<EvmAddress>()?.0,
+            value: a[7].parse()?,
+        };
+        client.build_broadcast_unshield_base_token(keys, &unshield, &offer, artifacts)?
+    } else if a[5] == "broadcast-transfer" {
         let transfer = Transfer {
             recipient: &a[6],
             token,
@@ -163,7 +176,7 @@ fn broadcast_command<S: ChainStore>(
         "fee {} to {} ({} gas at {} wei)",
         tx.fee, offer.railgun_address, tx.gas_estimate, tx.gas_price
     );
-    if a.get(9).map(String::as_str) == Some("--send") {
+    if a.last().map(String::as_str) == Some("--send") {
         println!(
             "0x{}",
             hex::encode(client.broadcast(&mut broadcasters, &tx)?)
@@ -272,7 +285,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("after: {:?}", client.poi_status(&proof)?);
             }
         }
-        "broadcasters" | "broadcast-transfer" | "broadcast-unshield" => {
+        "broadcasters" | "broadcast-transfer" | "broadcast-unshield" | "broadcast-unshield-eth" => {
             broadcast_command(&client, &keys, &artifacts, &a)?;
         }
         other => return Err(format!("unknown command {other}").into()),

@@ -24,7 +24,8 @@ example is a command line over the API.
 - Private transfers and unshields, proved in Rust. Notes from several trees, or more than
   10, are split into several Railgun transactions in one call. They spend only notes whose
   POI is valid, as the TS SDK does.
-- Native ETH: shielding it, and unshielding to it, through the RelayAdapt contract.
+- Native ETH: shielding it, and unshielding to it, through the RelayAdapt contract,
+  with your own account or a broadcaster paying gas.
 - View-only wallets from a shareable viewing key, in the engine's format.
 - POI proofs, submitted to the aggregator, so recipients can spend what they receive.
 - Broadcasters over Waku: signed fee offers, the fee note, pre-transaction POIs, and the
@@ -39,7 +40,8 @@ The engine also gets the same trees, notes and balances for all of Sepolia's his
 to block 12031295. On Arbitrum, Rust-built transfers, an unshield and a two-input
 transfer were mined and their POI proofs reached `Valid`. Anon wallet saw the funds as
 spendable. So did an 11-note transfer split into two Railgun transactions, an unshield to
-ETH through RelayAdapt, and a transfer a broadcaster submitted over Waku.
+ETH through RelayAdapt, and a transfer and an unshield to ETH that broadcasters submitted
+over Waku.
 
 ## Crates
 
@@ -94,7 +96,7 @@ To send through a broadcaster instead, which pays the gas and takes its fee priv
 use rg_core::{Broadcasters, POI_LIST, Waku};
 
 let mut broadcasters = Broadcasters::new(Waku::railgun()?, Network::ARBITRUM.chain_id);
-let offer = broadcasters.best_offer(&weth, POI_LIST)?.ok_or("no broadcaster")?;
+let offer = broadcasters.best_offer(&weth, POI_LIST, None)?.ok_or("no broadcaster")?;
 let artifacts = Artifacts::new("data/artifacts");
 let tx = client.build_broadcast_transfer(&keys, &transfer, &offer, &artifacts)?; // show tx.fee
 let hash = client.broadcast(&mut broadcasters, &tx)?;
@@ -102,7 +104,7 @@ let hash = client.broadcast(&mut broadcasters, &tx)?;
 
 `crates/rg-core/examples/wallet.rs` covers `sync`, `balance`, `history`, `transfer`,
 `unshield`, `unshield-eth`, `shield`, `shield-eth`, `estimate`, `send`, `poi`,
-`broadcasters`, `broadcast-transfer` and `broadcast-unshield`:
+`broadcasters`, `broadcast-transfer`, `broadcast-unshield` and `broadcast-unshield-eth`:
 
 ```sh
 cargo run --release -p rg-core --example wallet -- arbitrum <rpc url> <data dir> <mnemonic file> balance
@@ -127,12 +129,13 @@ again on every load.
 
 ## Not supported yet
 
-- Unshielding to ETH, and RelayAdapt calls in general, through a broadcaster.
-- Waku over WebSockets, which a browser would need.
-- NFTs.
-- Legacy (pre-2023) events, so a wallet with notes from before the squid seed cannot
-  scan them.
+- DeFi calls through RelayAdapt, with or without a broadcaster. Only its ETH shield and
+  unshield are built.
 - Running inside a real Android app, and timings on real phones.
+
+Not planned: NFTs; legacy (pre-2023) events, so a wallet with notes from before the
+squid seed cannot scan them; and Waku over WebSockets, since a browser wallet can use the
+TS wallet SDK.
 
 ## Development
 

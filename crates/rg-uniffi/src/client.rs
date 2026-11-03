@@ -260,6 +260,27 @@ impl RailgunClient {
         Ok(Arc::new(BroadcastTransaction { tx }))
     }
 
+    /// Proves an unshield of wrapped ETH that `to` receives as ETH, through RelayAdapt, for `offer`'s broadcaster to submit. Its fee is in wrapped ETH; pick the offer with `best_offer(wrapped token, true)`.
+    pub fn build_broadcast_unshield_base_token(
+        &self,
+        wallet: &Wallet,
+        to: String,
+        value: String,
+        offer: &BroadcasterOffer,
+    ) -> Result<Arc<BroadcastTransaction>, RailgunError> {
+        let unshield = UnshieldBaseToken {
+            to: address(&to)?,
+            value: amount(&value)?,
+        };
+        let tx = self.client().build_broadcast_unshield_base_token(
+            wallet.spending()?,
+            &unshield,
+            &offer.offer,
+            &self.artifacts,
+        )?;
+        Ok(Arc::new(BroadcastTransaction { tx }))
+    }
+
     /// Hands the batch to its broadcaster and waits up to two minutes for the hash of the transaction it sent. Once it is mined, prove and submit POI as for any send.
     pub fn broadcast(
         &self,

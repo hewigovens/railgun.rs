@@ -7,6 +7,7 @@ mod client;
 mod error;
 mod fee_quote;
 mod poi;
+mod route;
 mod send;
 mod store;
 mod sync;

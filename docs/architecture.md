@@ -189,6 +189,13 @@ leaf sits first in a stand-in tree of zeros, and its outputs at the fixed positi
 stand-ins, so once the transaction is mined the sender proves and submits POI as for any
 other send.
 
+An unshield to ETH through a broadcaster is sent to RelayAdapt with `useRelayAdapt`, and
+the fee note is in wrapped ETH. Only offers whose `relayAdapt` is this network's
+RelayAdapt are taken. The nullifiers, and so the relay hash the transactions commit to,
+change with every re-plan, so each round binds them again before estimating. Broadcasters
+refuse a relay whose calls must succeed, so, as in the engine, a failed unwrap or send
+leaves the ETH in RelayAdapt: the recipient must accept ETH.
+
 `Waku` is a light client. It never joins the relay mesh. It reads offers and answers
 with store queries, and hands requests to a node with light push. It finds nodes through
 the fleet's ENR tree in DNS, checked against the tree's pinned key, falling back to the
