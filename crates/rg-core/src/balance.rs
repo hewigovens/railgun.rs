@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use rg_keys::WalletKeys;
+use rg_keys::ViewOnlyKeys;
 use rg_poi::node::REQUIRED_LIST;
 use rg_wallet::{ScanResult, Txo, TxoSource};
 
@@ -73,7 +73,7 @@ impl<S: ChainStore> Client<S> {
     /// Each unspent note with its status, asked of the POI aggregator.
     pub fn note_statuses<'a>(
         &self,
-        keys: &WalletKeys,
+        keys: &ViewOnlyKeys,
         scan: &'a ScanResult,
     ) -> Result<Vec<(&'a Txo, NoteStatus)>, Error> {
         let ours = scan.spending_transactions();
@@ -105,7 +105,7 @@ impl<S: ChainStore> Client<S> {
     }
 
     /// Unspent value per token, split by POI status.
-    pub fn balances(&self, keys: &WalletKeys) -> Result<Vec<Balance>, Error> {
+    pub fn balances(&self, keys: &ViewOnlyKeys) -> Result<Vec<Balance>, Error> {
         let scan = self.scan(keys);
         let mut out: BTreeMap<[u8; 32], Balance> = BTreeMap::new();
         for (t, status) in self.note_statuses(keys, &scan)? {
@@ -120,7 +120,7 @@ impl<S: ChainStore> Client<S> {
     }
 
     /// The scan with only spendable notes left unspent, for choosing what a transaction spends: a note without POI can be spent on chain, but the POI proof for that transaction would then fail.
-    pub(crate) fn spendable_scan(&self, keys: &WalletKeys) -> Result<ScanResult, Error> {
+    pub(crate) fn spendable_scan(&self, keys: &ViewOnlyKeys) -> Result<ScanResult, Error> {
         let scan = self.scan(keys);
         let spendable: Vec<Txo> = self
             .note_statuses(keys, &scan)?

@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use rg_keys::WalletKeys;
+use rg_keys::{ViewOnlyKeys, WalletKeys};
 use rg_notes::note::note_public_key;
 use rg_poi::node::{AGGREGATOR, Node, REQUIRED_LIST, blinded_hex};
 use rg_poi::{
@@ -62,7 +62,7 @@ fn leaf(t: &SquidTransaction) -> Fr {
 }
 
 /// The blinded commitment the aggregator files a note under: `poseidon(commitment, npk, global position)`.
-pub(crate) fn blinded_input(keys: &WalletKeys, t: &Txo) -> String {
+pub(crate) fn blinded_input(keys: &ViewOnlyKeys, t: &Txo) -> String {
     let npk = note_public_key(&keys.master_public_key, &t.random);
     let at = global_tree_position(t.tree, t.position);
     blinded_hex(&blinded_commitment(&fr(&t.commitment), &npk, at))

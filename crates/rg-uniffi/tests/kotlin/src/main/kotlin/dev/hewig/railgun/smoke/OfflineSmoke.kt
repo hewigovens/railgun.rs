@@ -41,6 +41,12 @@ class OfflineSmoke {
         Check.that(isValidEvmAddress(account.address().lowercase()), "lowercase EVM address")
         Check.that(!isValidEvmAddress(account.address().replace('F', 'f')), "bad EIP-55 checksum")
 
+        val viewOnly = wallet.shareableViewingKey().toSecretBuffer().useOnce { Wallet.fromShareableViewingKey(it) }
+        Check.that(viewOnly.address() == address && viewOnly.isViewOnly() && !wallet.isViewOnly(), "view-only wallet has the same address")
+        Check.raises<RailgunException.InvalidInput>("bad viewing key") {
+            "82a5".toByteArray().toSecretBuffer().useOnce { Wallet.fromShareableViewingKey(it) }
+        }
+
         val dataDir = Files.createTempDirectory("rg-smoke").toString()
         Check.raises<RailgunException.InvalidInput>("unknown network") {
             RailgunClient.open("mars", "http://localhost:1", dataDir)
@@ -49,6 +55,11 @@ class OfflineSmoke {
         val client = RailgunClient.open("arbitrum", "http://localhost:1", dataDir)
         Check.that(client.balances(wallet).isEmpty(), "a new wallet has no balance")
         Check.that(client.history(wallet).isEmpty(), "a new wallet has no history")
+        Check.that(client.balances(viewOnly).isEmpty(), "a view-only wallet scans")
+        Check.raises<RailgunException.InvalidInput>("a view-only wallet cannot spend") {
+            client.buildTransfer(viewOnly, address, account.address(), "1", null)
+        }
+        viewOnly.close()
         wallet.close()
         Check.raises<RailgunException.Network>("no node") {
             client.sync()

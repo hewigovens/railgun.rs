@@ -1,6 +1,7 @@
 //! Wallet keys from a mnemonic (engine src/key-derivation/wallet-node.ts).
 
 use std::fmt;
+use std::ops::Deref;
 
 use ed25519_dalek::SigningKey;
 use rand::RngCore;
@@ -11,7 +12,7 @@ use unicode_normalization::UnicodeNormalization;
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 use crate::Error;
-use crate::address::{ADDRESS_VERSION, AddressData, encode_address};
+use crate::ViewOnlyKeys;
 use crate::bip32::KeyNode;
 
 pub const SPENDING_PATH_PREFIX: &str = "m/44'/1984'/0'/0'/";
@@ -25,18 +26,19 @@ pub fn viewing_path(index: u32) -> String {
     format!("{VIEWING_PATH_PREFIX}{index}'")
 }
 
-/// All keys of one Railgun wallet index, wiped on drop. Not `Clone`, so one value holds them; borrow it.
+/// All keys of one Railgun wallet index, wiped on drop: the spending key and the [`ViewOnlyKeys`], whose fields it derefs to. Not `Clone`, so one value holds them; borrow it.
 #[derive(ZeroizeOnDrop)]
 pub struct WalletKeys {
     pub spending_private_key: PrivateKey,
-    #[zeroize(skip)]
-    pub spending_public_key: Point,
-    pub viewing_private_key: PrivateKey,
-    #[zeroize(skip)]
-    pub viewing_public_key: [u8; 32],
-    pub nullifying_key: Fr,
-    #[zeroize(skip)]
-    pub master_public_key: Fr,
+    pub view: ViewOnlyKeys,
+}
+
+impl Deref for WalletKeys {
+    type Target = ViewOnlyKeys;
+
+    fn deref(&self) -> &ViewOnlyKeys {
+        &self.view
+    }
 }
 
 impl fmt::Debug for WalletKeys {
@@ -78,16 +80,6 @@ pub fn generate_mnemonic() -> Zeroizing<String> {
 }
 
 impl WalletKeys {
-    /// The 0zk address, valid on every chain.
-    pub fn address(&self) -> Result<String, Error> {
-        encode_address(&AddressData {
-            master_public_key: self.master_public_key,
-            viewing_public_key: self.viewing_public_key,
-            chain: None,
-            version: ADDRESS_VERSION,
-        })
-    }
-
     pub fn from_mnemonic(mnemonic: &str, password: &str, index: u32) -> Result<Self, Error> {
         Self::from_seed(&*mnemonic_to_seed(mnemonic, password)?, index)
     }
@@ -107,16 +99,9 @@ impl WalletKeys {
         viewing_private_key: PrivateKey,
     ) -> Self {
         let spending_public_key = babyjubjub::private_to_public(spending_private_key.expose());
-        let viewing_public_key = viewing_public_key(viewing_private_key.expose());
-        let nullifying_key = nullifying_key(viewing_private_key.expose());
-        let master_public_key = master_public_key(&spending_public_key, &nullifying_key);
         WalletKeys {
             spending_private_key,
-            spending_public_key,
-            viewing_private_key,
-            viewing_public_key,
-            nullifying_key,
-            master_public_key,
+            view: ViewOnlyKeys::new(viewing_private_key, spending_public_key),
         }
     }
 }

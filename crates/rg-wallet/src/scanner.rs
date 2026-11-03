@@ -1,4 +1,4 @@
-use rg_keys::WalletKeys;
+use rg_keys::ViewOnlyKeys;
 use rg_notes::transact::{ViewingKeys, decrypt_as_receiver, decrypt_as_sender};
 use rg_notes::{note, shield};
 use rg_primitives::{Fr, field};
@@ -7,12 +7,12 @@ use rg_sync::{Commitment, Leaf, SyncState};
 use crate::{ScanResult, SentNote, Txo, TxoSource};
 
 pub struct Scanner<'a> {
-    keys: &'a WalletKeys,
+    keys: &'a ViewOnlyKeys,
     viewing: ViewingKeys<'a>,
 }
 
 impl<'a> Scanner<'a> {
-    pub fn new(keys: &'a WalletKeys) -> Self {
+    pub fn new(keys: &'a ViewOnlyKeys) -> Self {
         let viewing = ViewingKeys {
             viewing_private_key: &keys.viewing_private_key,
             viewing_public_key: keys.viewing_public_key,

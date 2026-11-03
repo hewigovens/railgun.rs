@@ -28,6 +28,14 @@ struct OfflineSmoke {
         Check.that(isValidEvmAddress(address: account.address().lowercased()), "lowercase EVM address")
         Check.that(!isValidEvmAddress(address: account.address().replacingOccurrences(of: "F", with: "f")), "bad EIP-55 checksum")
 
+        var viewingKey = wallet.shareableViewingKey()
+        let viewOnly = try Wallet.fromShareableViewingKey(key: viewingKey)
+        viewingKey.wipe()
+        try Check.that(viewOnly.address() == wallet.address() && viewOnly.isViewOnly() && !wallet.isViewOnly(), "view-only wallet has the same address")
+        try Check.raises(RailgunError.self, where: \.isInvalidInput, "bad viewing key") {
+            try Wallet.fromShareableViewingKey(key: Data("82a5".utf8))
+        }
+
         let dataDir = NSTemporaryDirectory() + "rg-smoke-\(UUID().uuidString)"
         try Check.raises(RailgunError.self, where: \.isInvalidInput, "unknown network") {
             try RailgunClient.open(network: "mars", rpcUrl: "http://localhost:1", dataDir: dataDir)
@@ -36,6 +44,10 @@ struct OfflineSmoke {
         let client = try RailgunClient.open(network: "arbitrum", rpcUrl: "http://localhost:1", dataDir: dataDir)
         try Check.that(client.balances(wallet: wallet).isEmpty, "a new wallet has no balance")
         Check.that(client.history(wallet: wallet).isEmpty, "a new wallet has no history")
+        try Check.that(client.balances(wallet: viewOnly).isEmpty, "a view-only wallet scans")
+        try Check.raises(RailgunError.self, where: \.isInvalidInput, "a view-only wallet cannot spend") {
+            try client.buildTransfer(wallet: viewOnly, recipient: wallet.address(), token: account.address(), value: "1", memo: nil)
+        }
         try Check.raises(RailgunError.self, where: \.isNetwork, "no node") {
             try client.sync()
         }

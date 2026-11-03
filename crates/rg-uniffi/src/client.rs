@@ -65,13 +65,13 @@ impl RailgunClient {
 
     /// Unspent ERC20 balances as of the last sync, by POI status, which comes from the aggregator. Token addresses are checksummed.
     pub fn balances(&self, wallet: &Wallet) -> Result<Vec<TokenBalance>, RailgunError> {
-        let balances = self.client().balances(&wallet.keys)?;
+        let balances = self.client().balances(wallet.view())?;
         Ok(balances.into_iter().map(TokenBalance::from).collect())
     }
 
     /// Shields, receipts, sends and unshields as of the last sync, newest first. Change is left out.
     pub fn history(&self, wallet: &Wallet) -> Vec<HistoryItem> {
-        let history = self.client().history(&wallet.keys);
+        let history = self.client().history(wallet.view());
         history.into_iter().map(HistoryItem::from).collect()
     }
 
@@ -91,7 +91,7 @@ impl RailgunClient {
         };
         Ok(self
             .client()
-            .build_transfer(&wallet.keys, &transfer, &self.artifacts)?)
+            .build_transfer(wallet.spending()?, &transfer, &self.artifacts)?)
     }
 
     pub fn build_unshield(
@@ -108,7 +108,7 @@ impl RailgunClient {
         };
         Ok(self
             .client()
-            .build_unshield(&wallet.keys, &unshield, &self.artifacts)?)
+            .build_unshield(wallet.spending()?, &unshield, &self.artifacts)?)
     }
 
     /// The contract keeps its fee, so `receiver` gets slightly less than `value`. `value` needs an allowance first: see `build_approve`.
@@ -180,9 +180,9 @@ impl RailgunClient {
         wallet: &Wallet,
         tx_hash: String,
     ) -> Result<Arc<PoiSubmission>, RailgunError> {
-        let proof = self
-            .client()
-            .prove_poi(&wallet.keys, &hash(&tx_hash)?, &self.artifacts)?;
+        let proof =
+            self.client()
+                .prove_poi(wallet.spending()?, &hash(&tx_hash)?, &self.artifacts)?;
         Ok(Arc::new(PoiSubmission { proof }))
     }
 

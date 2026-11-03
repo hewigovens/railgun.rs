@@ -6,6 +6,8 @@ pub enum Error {
     InvalidMnemonic(String),
     #[error("invalid address: {0}")]
     InvalidAddress(&'static str),
+    #[error("invalid shareable viewing key")]
+    InvalidViewingKey,
     #[error("incorrect address version {0}")]
     AddressVersion(u8),
     #[error("invalid EVM address: {0}")]

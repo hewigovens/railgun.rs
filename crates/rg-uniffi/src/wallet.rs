@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use rg_keys::WalletKeys;
+use rg_keys::{ViewOnlyKeys, WalletKeys};
 
 use crate::RailgunError;
 
@@ -10,10 +10,33 @@ pub fn generate_mnemonic() -> Vec<u8> {
     rg_keys::generate_mnemonic().as_bytes().to_vec()
 }
 
-/// Spending and viewing keys, wiped when the last reference drops: `close()` in Kotlin, the last release in Swift. A shell keeps the mnemonic in its keychain and builds this when needed.
+enum Keys {
+    Spending(WalletKeys),
+    ViewOnly(ViewOnlyKeys),
+}
+
+/// Spending and viewing keys, or viewing keys alone for a view-only wallet, wiped when the last reference drops: `close()` in Kotlin, the last release in Swift. A shell keeps the mnemonic or shareable viewing key in its keychain and builds this when needed.
 #[derive(uniffi::Object)]
 pub struct Wallet {
-    pub(crate) keys: WalletKeys,
+    keys: Keys,
+}
+
+impl Wallet {
+    pub(crate) fn view(&self) -> &ViewOnlyKeys {
+        match &self.keys {
+            Keys::Spending(keys) => keys,
+            Keys::ViewOnly(view) => view,
+        }
+    }
+
+    pub(crate) fn spending(&self) -> Result<&WalletKeys, RailgunError> {
+        match &self.keys {
+            Keys::Spending(keys) => Ok(keys),
+            Keys::ViewOnly(_) => Err(RailgunError::invalid(
+                "a view-only wallet cannot spend or prove POI",
+            )),
+        }
+    }
 }
 
 #[uniffi::export]
@@ -24,10 +47,32 @@ impl Wallet {
         let mnemonic = std::str::from_utf8(mnemonic)
             .map_err(|_| RailgunError::invalid("mnemonic is not UTF-8"))?;
         let keys = WalletKeys::from_mnemonic(mnemonic, "", index)?;
-        Ok(Arc::new(Wallet { keys }))
+        Ok(Arc::new(Wallet {
+            keys: Keys::Spending(keys),
+        }))
+    }
+
+    /// A view-only wallet from a shareable viewing key (as from Railway or `shareable_viewing_key`): it scans, shows balances and history, and cannot spend. The key crosses by reference like a mnemonic.
+    #[uniffi::constructor]
+    pub fn from_shareable_viewing_key(key: &[u8]) -> Result<Arc<Self>, RailgunError> {
+        let key = std::str::from_utf8(key)
+            .map_err(|_| RailgunError::invalid("viewing key is not UTF-8"))?;
+        let view = ViewOnlyKeys::from_shareable_viewing_key(key)?;
+        Ok(Arc::new(Wallet {
+            keys: Keys::ViewOnly(view),
+        }))
     }
 
     pub fn address(&self) -> Result<String, RailgunError> {
-        Ok(self.keys.address()?)
+        Ok(self.view().address()?)
+    }
+
+    pub fn is_view_only(&self) -> bool {
+        matches!(self.keys, Keys::ViewOnly(_))
+    }
+
+    /// The shareable viewing key as UTF-8 bytes. It shows whoever holds it every note and transaction of this wallet, so wipe the buffer once it is stored or shown. As with `generate_mnemonic`, UniFFI frees its return buffer without a wipe.
+    pub fn shareable_viewing_key(&self) -> Vec<u8> {
+        self.view().shareable_viewing_key().as_bytes().to_vec()
     }
 }
