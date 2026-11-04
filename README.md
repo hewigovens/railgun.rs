@@ -43,8 +43,9 @@ The engine also gets the same trees, notes and balances for all of Sepolia's his
 to block 12031295. On Arbitrum, Rust-built transfers, an unshield and a two-input
 transfer were mined and their POI proofs reached `Valid`. Anon wallet saw the funds as
 spendable. So did an 11-note transfer split into two Railgun transactions, an unshield to
-ETH through RelayAdapt, a WETH to USDC swap on Uniswap through RelayAdapt, shielded back,
-and a transfer, an unshield to ETH and a swap that broadcasters submitted over Waku.
+ETH through RelayAdapt, and a transfer and an unshield to ETH that broadcasters submitted
+over Waku. A WETH to USDC swap on Uniswap through RelayAdapt, shielded back, was sent from
+our own account and through a broadcaster, and both reached `Valid`.
 
 ## Crates
 
