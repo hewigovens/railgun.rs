@@ -44,7 +44,7 @@ to block 12031295. On Arbitrum, Rust-built transfers, an unshield and a two-inpu
 transfer were mined and their POI proofs reached `Valid`. Anon wallet saw the funds as
 spendable. So did an 11-note transfer split into two Railgun transactions, an unshield to
 ETH through RelayAdapt, a WETH to USDC swap on Uniswap through RelayAdapt, shielded back,
-and a transfer and an unshield to ETH that broadcasters submitted over Waku.
+and a transfer, an unshield to ETH and a swap that broadcasters submitted over Waku.
 
 ## Crates
 
