@@ -8,7 +8,7 @@ use rg_poi::{
     TxidTrees, blinded_commitment, global_tree_position, railgun_txid, txid_leaf,
 };
 use rg_primitives::{Fr, field};
-use rg_sync::squid::{SquidTransaction, fetch_transactions, fetch_transactions_after};
+use rg_sync::squid::{SquidTransaction, fetch_transactions_after, fetch_transactions_in_blocks};
 use rg_tree::TREE_CAPACITY;
 use rg_tx::TransferParams;
 use rg_wallet::{ScanResult, Txo};
@@ -87,13 +87,22 @@ pub(crate) fn blinded_input(keys: &ViewOnlyKeys, t: &Txo) -> String {
     blinded_hex(&blinded_commitment(&fr(&t.commitment), &npk, at))
 }
 
+/// Blocks per window a transaction is looked up in, aligned so the window does not point at the block.
+const LOOKUP_BLOCKS: u64 = 100_000;
+
+struct TxidFetch {
+    leaves: Vec<Fr>,
+    settled: Vec<(String, [u8; 32])>,
+    recent: Vec<SquidTransaction>,
+}
+
 impl<S: ChainStore> Client<S> {
     pub(crate) fn node(&self) -> Node {
         Node::new(AGGREGATOR, self.network.chain_id)
     }
 
-    /// Every txid leaf. Hashing them is the slow part of a POI proof, so leaves past the reorg window are stored and later runs fetch only what came after.
-    fn txid_leaves(&mut self, url: &str) -> Result<Vec<Fr>, Error> {
+    /// Every txid leaf, the transactions behind the ones not stored yet, and the leaves to store once the aggregator has validated the root. Hashing leaves is the slow part of a POI proof, so leaves past the reorg window are stored and later runs fetch only what came after.
+    fn txid_leaves(&self, url: &str) -> Result<TxidFetch, Error> {
         let (stored, last_id) = self.store.txid_leaves()?;
         let recent = fetch_transactions_after(url, last_id.as_deref().unwrap_or(""))?;
         let final_block = self
@@ -110,8 +119,44 @@ impl<S: ChainStore> Client<S> {
                 settled.push((t.id.clone(), field::to_be_bytes(&hash)));
             }
         }
-        self.store.append_txid_leaves(&settled)?;
-        Ok(leaves)
+        Ok(TxidFetch {
+            leaves,
+            settled,
+            recent,
+        })
+    }
+
+    /// The Railgun transactions in `tx_hash`, from those just fetched or else from a fixed window of blocks around it, never by the hash itself.
+    fn transactions_in(
+        &self,
+        url: &str,
+        tx_hash: &[u8; 32],
+        recent: Vec<SquidTransaction>,
+    ) -> Result<Vec<SquidTransaction>, Error> {
+        let ours = |txs: Vec<SquidTransaction>| -> Vec<SquidTransaction> {
+            txs.into_iter()
+                .filter(|t| &t.transaction_hash == tx_hash)
+                .collect()
+        };
+        let txs = ours(recent);
+        if !txs.is_empty() {
+            return Ok(txs);
+        }
+        let Some(block) = self
+            .state
+            .nullifiers
+            .values()
+            .find(|r| &r.transaction_hash == tx_hash)
+            .map(|r| r.block_number)
+        else {
+            return Ok(Vec::new());
+        };
+        let from = block - block % LOOKUP_BLOCKS;
+        Ok(ours(fetch_transactions_in_blocks(
+            url,
+            from,
+            from + LOOKUP_BLOCKS - 1,
+        )?))
     }
 
     /// Proves POI for a transaction this wallet sent, on the smallest circuit that fits. The wallet must be synced past the transaction, and every note it spent must already be in the list.
@@ -137,11 +182,15 @@ impl<S: ChainStore> Client<S> {
             .network
             .squid
             .ok_or(Error::NoSquid(self.network.name))?;
-        let txs = fetch_transactions(url, tx_hash)?;
+        let TxidFetch {
+            leaves,
+            settled,
+            recent,
+        } = self.txid_leaves(url)?;
+        let txs = self.transactions_in(url, tx_hash, recent)?;
         if txs.is_empty() {
-            return Err(unprovable("not indexed yet"));
+            return Err(unprovable("not synced or not indexed yet"));
         }
-        let leaves = self.txid_leaves(url)?;
         let mut trees = TxidTrees::default();
         trees.extend(&leaves)?;
         let txids = Txids { leaves, trees };
@@ -158,6 +207,8 @@ impl<S: ChainStore> Client<S> {
                 "the aggregator has not validated this txid root yet",
             ));
         }
+        // Only now, so leaves the aggregator would reject never reach the store.
+        self.store.append_txid_leaves(&settled)?;
 
         let scan = self.scan(keys);
         let mut proof = PoiProof {
@@ -195,7 +246,16 @@ impl<S: ChainStore> Client<S> {
             .ok_or_else(|| unprovable("a spent note is not ours"))?;
         let blinded_in: Vec<String> = spent.iter().map(|t| blinded_input(keys, t)).collect();
 
-        let notes_out = &tx.commitments[..tx.commitments.len() - usize::from(tx.has_unshield)];
+        let notes_out = tx
+            .commitments
+            .len()
+            .checked_sub(usize::from(tx.has_unshield))
+            .map(|n| &tx.commitments[..n])
+            .ok_or_else(|| unprovable("an unshield with no commitment"))?;
+        let token_hash = spent
+            .first()
+            .map(|t| fr(&t.token_hash))
+            .ok_or_else(|| unprovable("no notes spent"))?;
         let start = tx.utxo_batch_start_position_out;
         let sent = notes_out
             .iter()
@@ -238,7 +298,7 @@ impl<S: ChainStore> Client<S> {
             commitments_out: frs(&tx.commitments),
             spending_public_key: [keys.spending_public_key.x, keys.spending_public_key.y],
             nullifying_key: keys.nullifying_key,
-            token_hash: fr(&spent[0].token_hash),
+            token_hash,
             spent: spent
                 .iter()
                 .map(|t| SpentNote {

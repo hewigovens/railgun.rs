@@ -104,10 +104,36 @@ pub fn decode_address(address: &str) -> Result<AddressData, Error> {
     };
     let mut viewing_public_key = [0u8; 32];
     viewing_public_key.copy_from_slice(&payload[41..73]);
+    // The engine accepts these, and anything sent to one is readable by all.
+    if rg_primitives::ed25519::is_weak_public_key(&viewing_public_key) {
+        return Err(Error::InvalidAddress("weak viewing key"));
+    }
     Ok(AddressData {
         master_public_key,
         viewing_public_key,
         chain,
         version,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_small_order_viewing_key_is_refused() {
+        let mut data = AddressData {
+            master_public_key: Fr::from(1u64),
+            viewing_public_key: [0; 32],
+            chain: None,
+            version: ADDRESS_VERSION,
+        };
+        // The identity point: every sender's shared key with it is the same public value.
+        data.viewing_public_key[0] = 1;
+        let address = encode_address(&data).unwrap();
+        assert_eq!(
+            decode_address(&address),
+            Err(Error::InvalidAddress("weak viewing key"))
+        );
+    }
 }

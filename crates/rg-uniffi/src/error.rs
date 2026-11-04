@@ -36,9 +36,12 @@ impl From<Error> for RailgunError {
     fn from(e: Error) -> Self {
         let reason = e.to_string();
         match e {
-            Error::Keys(_) | Error::BadAddress(_) | Error::WrongChain(..) | Error::NotOffered => {
-                RailgunError::InvalidInput { reason }
-            }
+            Error::Keys(_)
+            | Error::BadAddress(_)
+            | Error::WrongChain(..)
+            | Error::WrongNode(..)
+            | Error::InsecureRpc
+            | Error::NotOffered => RailgunError::InvalidInput { reason },
             Error::Tx(rg_core::TxError::InsufficientNote(_)) => {
                 RailgunError::InsufficientFunds { reason }
             }
@@ -49,7 +52,7 @@ impl From<Error> for RailgunError {
             | Error::Broadcaster(_) => RailgunError::Network { reason },
             Error::Sync(rg_sync::Error::Refused(_))
             | Error::NotProvable(..)
-            | Error::UnknownSeedRoot(_)
+            | Error::UnknownRoot(..)
             | Error::NoSquid(_)
             | Error::Refused(_) => RailgunError::Refused { reason },
             _ => RailgunError::Internal { reason },

@@ -104,8 +104,15 @@ flowchart TD
     J --> K["Spent if its nullifier was published"]
 ```
 
-`Client::sync` refetches a reorg window each time. `FileStore` keeps the seed, logs and a
-cursor, and `Client::open` replays them. Seeded leaves are hashes only, so a wallet's notes
+`Client::sync` checks that the node is on the network's chain, and refetches a reorg window
+each time. Each chunk of logs is applied, the root of every tree it changed is checked
+against the contract's `rootHistory`, and only then is the chunk stored, so a log that does
+not apply, or a dropped one, never reaches the store. The check goes through the same node:
+it catches a node that lost or garbled a log, not one that lies about the root as well, and
+a hidden `Nullified` event changes no root. `FileStore` keeps the seed, logs and a cursor,
+and `Client::open` replays them; a stored log that no longer applies is dropped with
+everything after it, to be fetched again. The RPC URL must be https, or plain http to this
+machine. Seeded leaves are hashes only, so a wallet's notes
 must all come after the seed. A nullifier
 hashes only the leaf position, so lookups are always scoped to a tree.
 
@@ -151,8 +158,11 @@ nullifiers are known before proving, so no dummy proof is needed to make that ha
 
 Cross-contract calls, such as a swap, take the same path: the transactions unshield each
 token to RelayAdapt, and the action holds the caller's calls, then one `shield` of
-RelayAdapt's whole balance of each listed token back to a 0zk address. The caller builds
-the calls, approvals included, since they run from RelayAdapt's address. The action's
+RelayAdapt's whole balance of each listed token back to a 0zk address. Every unshielded
+token is shielded back as well, since anyone can take what a relay leaves in RelayAdapt,
+and a token listed twice is unshielded once. The caller builds the calls, approvals
+included, since they run from RelayAdapt's address, and the gas limit is at least
+3,200,000. A relay call that fails a gas estimate comes back as its index and reason. The action's
 `minGasLimit` is the requested gas less 150,000, and the relay checks `gasleft()` against
 it, so a broadcaster cannot starve the calls. A self-sent relay requires every call to
 succeed.
@@ -245,6 +255,19 @@ engine's `getBalanceBucket` does. Transfers and unshields spend only notes it re
 `Valid`: a pending note would pass on chain, but the POI proof for that transaction could
 not be made, so the recipient's funds would stay pending. Blinded commitments
 are `poseidon(commitment, npk, global position)`, so the list holds no amounts or addresses.
+
+To find a sent transaction in the squid, the core looks among the transactions it fetched
+for the txid tree, or else asks for a fixed 100,000-block window around it, never for the
+hash itself, so the squid does not learn which transaction is the wallet's. Txid leaves are
+stored only after the aggregator has validated their root.
+
+Answers from the RPC node, the squid and the aggregator are capped in size, as are circuit
+downloads before and after decompression. Gas estimates above 30 million and gas prices
+above 10,000 gwei are refused, which bounds the fees a lying node can make a broadcast or a
+fee quote pay. The broadcaster's fee is still whatever its signed offer and the node's
+prices give, so a shell shows `BroadcastTx.fee` before handing the batch over. When the
+node already sees the transaction a broadcaster names, it must carry the batch that was
+sent.
 
 POI artifacts are versioned apart from the engine, and the live aggregator rejects proofs
 made with older keys. `docs/development.md` records the current IPFS root.

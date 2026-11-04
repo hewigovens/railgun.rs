@@ -140,6 +140,9 @@ struct Spend<'a> {
 
 type Fill<'f> = &'f mut dyn FnMut(&mut [u8]);
 
+/// Note values are 120 bits on chain.
+pub(crate) const MAX_NOTE_VALUE: u128 = (1 << 120) - 1;
+
 /// One transaction per note group. The first group pays the broadcaster fee first, `pay` makes the outputs that pay out a group's share, and whatever the last group has left over goes back to this wallet as change.
 fn plan_spend<'a>(
     keys: &WalletKeys,
@@ -153,7 +156,11 @@ fn plan_spend<'a>(
         return Err(Error::ZeroValue);
     }
     let fee = spend.broadcaster_fee.as_ref().map_or(0, |f| f.value);
-    let needed = spend.value + fee;
+    let needed = spend
+        .value
+        .checked_add(fee)
+        .filter(|v| *v <= MAX_NOTE_VALUE)
+        .ok_or(Error::OutOfRange("value"))?;
     let groups = select_notes(scan.unspent(), &spend.token_hash, needed)
         .ok_or(Error::InsufficientNote(needed))?;
     let mut left = needed;

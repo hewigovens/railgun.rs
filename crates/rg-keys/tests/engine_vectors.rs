@@ -196,7 +196,15 @@ fn bech32_vectors() {
             chain,
             version: 1,
         };
-        assert_eq!(decode_address(address).unwrap(), data);
+        // Zero is a small-order point, so its key is refused when decoding, though it still encodes as the engine does.
+        if rg_primitives::ed25519::is_weak_public_key(&bytes) {
+            assert_eq!(
+                decode_address(address),
+                Err(Error::InvalidAddress("weak viewing key"))
+            );
+        } else {
+            assert_eq!(decode_address(address).unwrap(), data);
+        }
         let encoded = encode_address(&data).unwrap();
         assert_eq!(encoded, address);
         assert_eq!(encoded.len(), 127);

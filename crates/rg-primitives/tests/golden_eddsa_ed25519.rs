@@ -157,7 +157,7 @@ fn ed25519_scalars_blinding_and_shared_keys_match_engine() {
             &h(&v.receiver_viewing_private_key),
             &b.blinded_sender_viewing_key,
         );
-        assert_eq!(hex::encode(k1.unwrap()), v.shared_key);
+        assert_eq!(hex::encode(k1.as_deref().unwrap()), v.shared_key);
         assert_eq!(k1, k2);
         assert_eq!(
             unblind_key(&b.blinded_sender_viewing_key, &random, &sender_random),

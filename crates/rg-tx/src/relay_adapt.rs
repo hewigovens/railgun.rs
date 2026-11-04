@@ -1,7 +1,7 @@
 //! The RelayAdapt contract (engine `relay-adapt-helper.ts` and `RelayAdaptV2Contract`): it wraps ETH before a shield, unwraps after an unshield to itself, and runs other contracts' calls between an unshield and a shield.
 
 use alloy_primitives::{Address, B256, Bytes, FixedBytes, U256, keccak256};
-use alloy_sol_types::{SolCall, SolValue};
+use alloy_sol_types::{SolCall, SolError, SolValue};
 use rg_keys::AddressData;
 use rg_primitives::Fr;
 use rg_sync::abi;
@@ -113,7 +113,11 @@ pub fn cross_contract_calls_action(
     random: [u8; 31],
     require_success: bool,
     min_gas_limit: u64,
-) -> abi::ActionData {
+) -> Result<abi::ActionData, Error> {
+    // With the contract's floor at zero, a broadcaster could send too little gas for the calls and still be paid.
+    if min_gas_limit < CROSS_CONTRACT_MIN_GAS_LIMIT {
+        return Err(Error::GasLimitTooLow(CROSS_CONTRACT_MIN_GAS_LIMIT));
+    }
     let mut ordered: Vec<abi::Call> = calls
         .iter()
         .map(|c| abi::Call {
@@ -128,12 +132,22 @@ pub fn cross_contract_calls_action(
         };
         ordered.push(call(relay_adapt, shield.abi_encode()));
     }
-    abi::ActionData {
+    Ok(abi::ActionData {
         random: FixedBytes::from(random),
         requireSuccess: require_success,
-        minGasLimit: U256::from(min_gas_limit.saturating_sub(RELAY_GAS_OVERHEAD)),
+        minGasLimit: U256::from(min_gas_limit - RELAY_GAS_OVERHEAD),
         calls: ordered,
-    }
+    })
+}
+
+/// The call index and reason in a relay's `CallFailed` revert (`parseRelayAdaptReturnValue`): the reason string when the call reverted with one, else its raw bytes in hex.
+pub fn decode_call_failed(revert: &[u8]) -> Option<(u64, String)> {
+    let failed = abi::CallFailed::abi_decode(revert).ok()?;
+    let reason = alloy_sol_types::Revert::abi_decode(&failed.revertReason).map_or_else(
+        |_| alloy_primitives::hex::encode_prefixed(&failed.revertReason),
+        |r| r.reason,
+    );
+    Some((failed.callIndex.saturating_to(), reason))
 }
 
 /// `getRelayAdaptParams`: keccak of `abi.encode(nullifiers of each transaction, transaction count, action)`.
@@ -206,7 +220,8 @@ mod tests {
                 [0xab; 31],
                 require_success,
                 CROSS_CONTRACT_MIN_GAS_LIMIT,
-            );
+            )
+            .unwrap();
             hex::encode(relay_adapt_params(&nullifiers, &action))
         };
         assert_eq!(
@@ -216,6 +231,23 @@ mod tests {
         assert_eq!(
             params(true),
             "d52c6cc044e50786f4370c05c8a8577a49fd6dcae5849986598ba01f1f51e7ca"
+        );
+    }
+
+    #[test]
+    fn a_gas_limit_below_the_floor_is_refused() {
+        let action = |gas| cross_contract_calls_action([1; 20], &[], vec![], [0; 31], false, gas);
+        assert!(matches!(action(0), Err(Error::GasLimitTooLow(_))));
+        assert!(action(CROSS_CONTRACT_MIN_GAS_LIMIT).is_ok());
+    }
+
+    // A swap whose minimum output was not met, as Arbitrum's node returned it from a relay's gas estimate.
+    #[test]
+    fn reads_which_call_failed_and_why() {
+        let revert = hex::decode("5c0dee5d00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000006408c379a000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000013546f6f206c6974746c652072656365697665640000000000000000000000000000000000000000000000000000000000000000000000000000000000").unwrap();
+        assert_eq!(
+            decode_call_failed(&revert),
+            Some((1, "Too little received".to_string()))
         );
     }
 }

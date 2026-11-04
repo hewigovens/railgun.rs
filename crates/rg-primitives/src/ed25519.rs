@@ -26,10 +26,17 @@ pub fn public_key(private_key: &[u8; 32]) -> [u8; 32] {
 }
 
 /// `getSharedSymmetricKey`: sha256 of the compressed point `pub * scalar(prv)`. None when `public_key` is not a curve point. Like the engine's wasm path (curve25519-dalek), a non-canonical y encoding is accepted.
-pub fn shared_key(private_key: &[u8; 32], public_key: &[u8; 32]) -> Option<[u8; 32]> {
+pub fn shared_key(private_key: &[u8; 32], public_key: &[u8; 32]) -> Option<Zeroizing<[u8; 32]>> {
     let point = CompressedEdwardsY(*public_key).decompress()?;
-    let shared = (point * *private_scalar(private_key)).compress();
-    Some(Sha256::digest(shared.as_bytes()).into())
+    let shared = Zeroizing::new((point * *private_scalar(private_key)).compress().to_bytes());
+    Some(Zeroizing::new(Sha256::digest(*shared).into()))
+}
+
+/// A viewing key no one should encrypt to: not a curve point, or of small order, which gives the same shared key for every sender, one anyone can compute.
+pub fn is_weak_public_key(public_key: &[u8; 32]) -> bool {
+    CompressedEdwardsY(*public_key)
+        .decompress()
+        .is_none_or(|p| p.is_small_order())
 }
 
 /// noble-ed25519's `getSharedSecret`, which keys broadcaster messages: X25519 of the clamped sha512(prv)[0..32] with `public_key` mapped to Montgomery form. None when `public_key` is not a curve point or the result is zero.

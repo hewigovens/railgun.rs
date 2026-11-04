@@ -25,7 +25,7 @@ pub struct Txo {
     /// Where the nullifier was published, if it has been.
     pub spent: Option<NullifierRecord>,
     pub memo_text: Option<String>,
-    /// For transfers whose sender chose to be visible.
+    /// For transfers whose sender chose to be visible. Unverified: the sender writes it, so anyone can claim any address here.
     pub sender_master_public_key: Option<Fr>,
 }
 
@@ -71,7 +71,8 @@ impl ScanResult {
     pub fn balances(&self) -> BTreeMap<[u8; 32], u128> {
         let mut out = BTreeMap::new();
         for t in self.unspent() {
-            *out.entry(t.token_hash).or_insert(0u128) += t.value;
+            let total = out.entry(t.token_hash).or_insert(0u128);
+            *total = total.saturating_add(t.value);
         }
         out
     }

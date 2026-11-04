@@ -10,16 +10,54 @@ use crate::{Artifacts, ChainStore, Client, Error, Unshield, UnsignedTx};
 
 /// Tokens unshielded to RelayAdapt, calls it then makes with them, such as a swap, and the tokens whose whole balance it shields back afterwards, all in one `relay` (the wallet SDK's cross-contract calls).
 pub struct CrossContractCalls<'a> {
-    /// Token and value. The contract keeps its fee, so RelayAdapt receives slightly less than each value.
+    /// Token and value. The contract keeps its fee, so RelayAdapt receives slightly less than each value. A token listed twice is unshielded once, for the sum.
     pub unshields: Vec<([u8; 20], u128)>,
     /// Made from RelayAdapt's address, so it approves any spender itself, with a call to the token.
     pub calls: Vec<ContractCall>,
-    /// Tokens RelayAdapt shields all it holds of once the calls are done, usually what the calls bought and what they left over.
+    /// Tokens RelayAdapt shields all it holds of once the calls are done, usually what the calls bought. Every unshielded token is shielded back too, since anyone can take what is left in RelayAdapt.
     pub shields: Vec<[u8; 20]>,
     /// 0zk address the shields go to.
     pub shield_receiver: &'a str,
-    /// The least gas the relay is sent with: [`crate::CROSS_CONTRACT_MIN_GAS_LIMIT`] unless the calls need more.
+    /// The least gas the relay is sent with: at least [`crate::CROSS_CONTRACT_MIN_GAS_LIMIT`], more if the calls need it.
     pub min_gas_limit: u64,
+}
+
+impl CrossContractCalls<'_> {
+    /// One unshield per token, to RelayAdapt, so the same notes are never picked twice.
+    fn unshields_to(&self, relay_adapt: [u8; 20]) -> Result<Vec<Unshield>, Error> {
+        let mut unshields: Vec<Unshield> = Vec::new();
+        for &(token, value) in &self.unshields {
+            match unshields.iter_mut().find(|u| u.token == token) {
+                Some(u) => {
+                    u.value = u
+                        .value
+                        .checked_add(value)
+                        .ok_or(rg_tx::Error::OutOfRange("value"))?;
+                }
+                None => unshields.push(Unshield {
+                    to: relay_adapt,
+                    token,
+                    value,
+                }),
+            }
+        }
+        Ok(unshields)
+    }
+
+    /// The listed tokens, then any unshielded token not among them, once each.
+    fn shield_tokens(&self) -> Vec<[u8; 20]> {
+        let mut tokens: Vec<[u8; 20]> = Vec::new();
+        for token in self
+            .shields
+            .iter()
+            .chain(self.unshields.iter().map(|(t, _)| t))
+        {
+            if !tokens.contains(token) {
+                tokens.push(*token);
+            }
+        }
+        tokens
+    }
 }
 
 impl<S: ChainStore> Client<S> {
@@ -45,8 +83,9 @@ impl<S: ChainStore> Client<S> {
         let relay_adapt = address(self.network.relay_adapt)?;
         let receiver = decode_address(calls.shield_receiver)?;
         let mut rng = rand::rngs::OsRng;
-        let shields = calls
-            .shields
+        let unshields = calls.unshields_to(relay_adapt)?;
+        let tokens = calls.shield_tokens();
+        let shields = tokens
             .iter()
             .map(|token| relay_shield_request(&receiver, *token, |b| rng.fill_bytes(b)))
             .collect::<Result<Vec<_>, _>>()?;
@@ -59,16 +98,7 @@ impl<S: ChainStore> Client<S> {
             random,
             require_success,
             calls.min_gas_limit,
-        );
-        let unshields = calls
-            .unshields
-            .iter()
-            .map(|&(token, value)| Unshield {
-                to: relay_adapt,
-                token,
-                value,
-            })
-            .collect();
+        )?;
         let route = Route::relay(self.network.relay_adapt, relay_adapt, action);
         Ok((unshields, route))
     }
@@ -87,5 +117,30 @@ impl<S: ChainStore> Client<S> {
             planned.extend(self.plan_unshield(keys, unshield, fee.take(), min_gas_price)?);
         }
         Ok(planned)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unshields_merge_by_token_and_all_come_back() {
+        let (a, b, c) = ([1; 20], [2; 20], [3; 20]);
+        let calls = CrossContractCalls {
+            unshields: vec![(a, 5), (b, 1), (a, 7)],
+            calls: vec![],
+            shields: vec![c, c],
+            shield_receiver: "",
+            min_gas_limit: crate::CROSS_CONTRACT_MIN_GAS_LIMIT,
+        };
+        let merged: Vec<_> = calls
+            .unshields_to([9; 20])
+            .unwrap()
+            .iter()
+            .map(|u| (u.token, u.value))
+            .collect();
+        assert_eq!(merged, vec![(a, 12), (b, 1)]);
+        assert_eq!(calls.shield_tokens(), vec![c, a, b]);
     }
 }

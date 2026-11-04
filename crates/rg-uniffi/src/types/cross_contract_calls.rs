@@ -18,7 +18,7 @@ pub struct RelayCall {
     pub value: String,
 }
 
-/// Tokens unshielded to RelayAdapt, the calls it then makes with them, such as an approve and a swap, and the tokens whose whole balance it shields back to `shield_receiver`. The contract keeps its fee from each unshield, so RelayAdapt receives slightly less. `min_gas_limit` is the least gas the relay is sent with; 3,200,000 unless the calls need more.
+/// Tokens unshielded to RelayAdapt, the calls it then makes with them, such as an approve and a swap, and the tokens whose whole balance it shields back to `shield_receiver`. The contract keeps its fee from each unshield, so RelayAdapt receives slightly less. `min_gas_limit` is the least gas the relay is sent with: at least 3,200,000, more if the calls need it.
 #[derive(uniffi::Record)]
 pub struct CrossContractCalls {
     pub unshields: Vec<TokenAmount>,

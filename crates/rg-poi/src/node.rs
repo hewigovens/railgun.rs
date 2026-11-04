@@ -1,6 +1,7 @@
 //! Aggregator JSON-RPC (wallet `poi-node-request.ts`).
 
 use std::collections::BTreeMap;
+use std::io::Read;
 
 use rg_primitives::{Fr, field};
 use rg_tree::TREE_DEPTH;
@@ -12,11 +13,15 @@ pub const AGGREGATOR: &str = "https://ppoi.fdi.network";
 /// `POI_REQUIRED_LISTS` in shared-models.
 pub const REQUIRED_LIST: &str = "efc6ddb59c098a13fb2b618fdae94c1c3a807abc8fb1837c93620c9143ee9e88";
 const TXID_VERSION: &str = "V2_PoseidonMerkle";
+/// Far above an honest answer, so a hostile aggregator cannot exhaust memory.
+const MAX_RESPONSE: u64 = 64 << 20;
 
 #[derive(Debug, thiserror::Error)]
 pub enum NodeError {
     #[error("http: {0}")]
     Http(#[from] reqwest::Error),
+    #[error("response: {0}")]
+    Body(String),
     #[error("{method}: {detail}")]
     Rpc {
         method: &'static str,
@@ -59,7 +64,22 @@ impl Node {
         params["chainID"] = json!(self.chain_id.to_string());
         params["txidVersion"] = json!(TXID_VERSION);
         let body = json!({"jsonrpc": "2.0", "id": 1, "method": method, "params": params});
-        let resp: Value = self.http.post(&self.url).json(&body).send()?.json()?;
+        let response = self
+            .http
+            .post(&self.url)
+            .json(&body)
+            .send()
+            .map_err(reqwest::Error::without_url)?;
+        let mut bytes = Vec::new();
+        response
+            .take(MAX_RESPONSE + 1)
+            .read_to_end(&mut bytes)
+            .map_err(|e| NodeError::Body(e.to_string()))?;
+        if bytes.len() as u64 > MAX_RESPONSE {
+            return Err(NodeError::Body("response too large".into()));
+        }
+        let resp: Value =
+            serde_json::from_slice(&bytes).map_err(|e| NodeError::Body(e.to_string()))?;
         if let Some(err) = resp.get("error") {
             return Err(NodeError::Rpc {
                 method,

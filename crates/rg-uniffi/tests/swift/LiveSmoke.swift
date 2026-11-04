@@ -35,7 +35,7 @@ struct LiveSmoke {
         let balances = try client.balances(wallet: wallet)
         print("balances: \(balances)")
         Check.that(balances.contains { $0.spendable != "0" }, "the test wallet has a spendable balance")
-        let history = client.history(wallet: wallet)
+        let history = try client.history(wallet: wallet)
         print("history: \(history.count) items, latest \(String(describing: history.first))")
         Check.that(!history.isEmpty, "the test wallet has history")
 

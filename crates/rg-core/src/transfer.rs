@@ -126,11 +126,16 @@ impl<S: ChainStore> Client<S> {
             min_gas_price,
             broadcaster_fee,
         };
-        self.plan(keys, &request.token_hash, request.value + fee, |scan| {
-            plan_transfer(keys, &self.state, scan, &request, |b| {
-                rand::rngs::OsRng.fill_bytes(b)
-            })
-        })
+        self.plan(
+            keys,
+            &request.token_hash,
+            request.value.saturating_add(fee),
+            |scan| {
+                plan_transfer(keys, &self.state, scan, &request, |b| {
+                    rand::rngs::OsRng.fill_bytes(b)
+                })
+            },
+        )
     }
 
     /// Plans and proves an unshield.
@@ -194,11 +199,16 @@ impl<S: ChainStore> Client<S> {
             broadcaster_fee,
         };
         let token_hash = rg_notes::TokenData::erc20(unshield.token).hash();
-        self.plan(keys, &token_hash, unshield.value + fee, |scan| {
-            plan_unshield(keys, &self.state, scan, &request, |b| {
-                rand::rngs::OsRng.fill_bytes(b)
-            })
-        })
+        self.plan(
+            keys,
+            &token_hash,
+            unshield.value.saturating_add(fee),
+            |scan| {
+                plan_unshield(keys, &self.state, scan, &request, |b| {
+                    rand::rngs::OsRng.fill_bytes(b)
+                })
+            },
+        )
     }
 
     /// Plans against spendable notes only. When notes still waiting for POI would have covered `value`, says so rather than reporting a shortfall.
@@ -241,8 +251,6 @@ impl<S: ChainStore> Client<S> {
 
     /// Asks the node whether `from` could send this now.
     pub fn estimate_gas(&self, from: &str, tx: &UnsignedTx) -> Result<u64, Error> {
-        Ok(self
-            .rpc
-            .estimate_gas(from, &tx.to, tx.value, &tx.data_hex())?)
+        self.node_estimate(from, &tx.to, tx.value, &tx.data_hex())
     }
 }

@@ -15,6 +15,8 @@ const TRANSACT_ROOT: &str = "QmUsmnK4PFc7zDp2cmC4wBZxYLjNyRgWfs5GNcJJ2uLcpU";
 const POI_ROOT: &str = "QmZ2MyM6TKxffkv6stuo2hFwmUfs3q4xgMYN164Sje8new";
 const HASHES: &str = include_str!("artifact-v2-hashes.json");
 const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(600);
+/// Above the largest circuit file, the 13x13 POI key at about 48 MB.
+const MAX_ARTIFACT: u64 = 256 << 20;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Circuit {
@@ -117,18 +119,20 @@ impl Artifacts {
 
         let url = circuit.url(kind);
         let download = |e: reqwest::Error| Error::Download(url.clone(), e.to_string());
-        let compressed = reqwest::blocking::Client::builder()
+        let response = reqwest::blocking::Client::builder()
             .timeout(DOWNLOAD_TIMEOUT)
             .build()
             .map_err(download)?
             .get(&url)
             .send()
             .and_then(reqwest::blocking::Response::error_for_status)
-            .and_then(|r| r.bytes())
             .map_err(download)?;
+        // Capped both ways, so a hostile gateway cannot exhaust memory before the hash check.
         let mut data = Vec::new();
-        brotli::Decompressor::new(compressed.as_ref(), 4096).read_to_end(&mut data)?;
-        if sha256_hex(&data) != expected {
+        brotli::Decompressor::new(response.take(MAX_ARTIFACT), 4096)
+            .take(MAX_ARTIFACT + 1)
+            .read_to_end(&mut data)?;
+        if data.len() as u64 > MAX_ARTIFACT || sha256_hex(&data) != expected {
             return Err(Error::ArtifactHash(url));
         }
 

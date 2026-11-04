@@ -43,7 +43,7 @@ struct OfflineSmoke {
 
         let client = try RailgunClient.open(network: "arbitrum", rpcUrl: "http://localhost:1", dataDir: dataDir)
         try Check.that(client.balances(wallet: wallet).isEmpty, "a new wallet has no balance")
-        Check.that(client.history(wallet: wallet).isEmpty, "a new wallet has no history")
+        try Check.that(client.history(wallet: wallet).isEmpty, "a new wallet has no history")
         try Check.that(client.balances(wallet: viewOnly).isEmpty, "a view-only wallet scans")
         try Check.raises(RailgunError.self, where: \.isInvalidInput, "a view-only wallet cannot spend") {
             try client.buildTransfer(wallet: viewOnly, recipient: wallet.address(), token: account.address(), value: "1", memo: nil)

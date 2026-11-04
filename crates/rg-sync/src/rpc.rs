@@ -6,6 +6,7 @@ use serde_json::{Value, json};
 
 use crate::Error;
 use crate::abi;
+use crate::http::post_json;
 use crate::log::RawLog;
 
 /// What became of a mined transaction.
@@ -21,6 +22,10 @@ fn quantity(value: &Value, what: &str) -> Result<u128, Error> {
         .as_str()
         .and_then(|s| u128::from_str_radix(s.trim_start_matches("0x"), 16).ok())
         .ok_or_else(|| Error::Rpc(format!("bad {what}: {value}")))
+}
+
+fn small(value: u128, what: &str) -> Result<u64, Error> {
+    u64::try_from(value).map_err(|_| Error::Rpc(format!("{what} out of range: {value}")))
 }
 
 fn address_hex(address: &[u8; 20]) -> String {
@@ -42,13 +47,7 @@ impl RpcClient {
 
     fn call(&self, method: &str, params: Value) -> Result<Value, Error> {
         let body = json!({"jsonrpc": "2.0", "id": 1, "method": method, "params": params});
-        let resp: Value = self
-            .http
-            .post(&self.url)
-            .json(&body)
-            .send()
-            .and_then(|r| r.json())
-            .map_err(|e| Error::Rpc(e.to_string()))?;
+        let resp = post_json(&self.http, &self.url, &body)?;
         if let Some(err) = resp.get("error") {
             return Err(Error::Refused(err.to_string()));
         }
@@ -70,12 +69,12 @@ impl RpcClient {
             "eth_estimateGas",
             json!([{"from": from, "to": to, "value": value, "data": data}]),
         )?;
-        Ok(quantity(&v, "gas estimate")? as u64)
+        small(quantity(&v, "gas estimate")?, "gas estimate")
     }
 
     pub fn block_number(&self) -> Result<u64, Error> {
         let v = self.call("eth_blockNumber", json!([]))?;
-        Ok(quantity(&v, "block number")? as u64)
+        small(quantity(&v, "block number")?, "block number")
     }
 
     /// Logs of `address` in `[from, to]`, fetched `chunk` blocks at a time, sorted by (block, log index).
@@ -179,7 +178,7 @@ impl RpcClient {
             "eth_getTransactionCount",
             json!([address_hex(owner), "pending"]),
         )?;
-        Ok(quantity(&v, "nonce")? as u64)
+        small(quantity(&v, "nonce")?, "nonce")
     }
 
     pub fn base_fee(&self) -> Result<u128, Error> {
@@ -213,8 +212,30 @@ impl RpcClient {
         }
         Ok(Some(Receipt {
             success: quantity(&v["status"], "status")? == 1,
-            block_number: quantity(&v["blockNumber"], "block number")? as u64,
-            gas_used: quantity(&v["gasUsed"], "gas used")? as u64,
+            block_number: small(quantity(&v["blockNumber"], "block number")?, "block number")?,
+            gas_used: small(quantity(&v["gasUsed"], "gas used")?, "gas used")?,
         }))
+    }
+
+    pub fn chain_id(&self) -> Result<u64, Error> {
+        let v = self.call("eth_chainId", json!([]))?;
+        small(quantity(&v, "chain id")?, "chain id")
+    }
+
+    /// The `to` and calldata of a transaction the node knows, mined or pending.
+    pub fn transaction_call(&self, hash: &[u8; 32]) -> Result<Option<(String, Vec<u8>)>, Error> {
+        let hash = format!("0x{}", hex::encode(hash));
+        let v = self.call("eth_getTransactionByHash", json!([hash]))?;
+        if v.is_null() {
+            return Ok(None);
+        }
+        let field = |name: &str| {
+            v[name]
+                .as_str()
+                .ok_or_else(|| Error::Rpc(format!("transaction without {name}")))
+        };
+        let input = hex::decode(field("input")?.trim_start_matches("0x"))
+            .map_err(|e| Error::Rpc(e.to_string()))?;
+        Ok(Some((field("to")?.to_string(), input)))
     }
 }

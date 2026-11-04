@@ -9,6 +9,15 @@ engine accepts. Missing features are in the README under "Not supported yet".
   PBKDF2 on any words, and wallet SDK 11.2.0 passes the mnemonic straight through. Both
   NFKD-normalize the mnemonic and password first, so a non-ASCII password gives the same
   seed either way.
+- `decode_address` also rejects a viewing key that is not a curve point or has small
+  order: every sender's shared key with such a key is the same public value, so anything
+  sent to it is readable by all. The engine encrypts to it.
+- The scanner drops a received note whose token hash is not reduced mod p. The commitment
+  reduces it, so such a note matches its leaf, but the engine would file it under a token
+  that does not exist and never spend it.
+- A cross-contract relay needs a gas limit of at least 3,200,000, the engine's default;
+  the engine takes any `minGasLimit` above 150,000. Every unshielded token is shielded
+  back, and a token listed twice is merged.
 - `decode_address` rejects an address whose master public key is at or above the BN254
   modulus; the engine reads any 256-bit value. A real MPK is a Poseidon output and never
   is, so such an address belongs to nobody. One engine test vector has one.

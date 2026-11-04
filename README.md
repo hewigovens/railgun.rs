@@ -16,7 +16,7 @@ example is a command line over the API.
 
 - Keys from a BIP39 mnemonic, 0zk addresses, and a separate EVM account that pays gas.
 - Sync from an RPC node, with the Railgun squid seeding pre-2023 leaves on mainnets and
-  every root checked against the contract.
+  every tree's root checked against the contract after each batch of logs.
 - Scanning and decryption of your notes, spent status, and history: shields, receipts,
   sends and unshields.
 - Balances split by POI status (spendable, shield pending, missing POI and so on), from

@@ -119,7 +119,11 @@ impl<'a, R: Read + Seek> BinFile<'a, R> {
         let a_query = self.a_query(header.n_vars)?;
         let b_g1_query = self.b_g1_query(header.n_vars)?;
         let b_g2_query = self.b_g2_query(header.n_vars)?;
-        let l_query = self.l_query(header.n_vars - header.n_public - 1)?;
+        let l_len = header
+            .n_vars
+            .checked_sub(header.n_public + 1)
+            .ok_or(SerializationError::InvalidData)?;
+        let l_query = self.l_query(l_len)?;
         let h_query = self.h_query(header.domain_size as usize)?;
 
         let vk = VerifyingKey::<Bn254> {

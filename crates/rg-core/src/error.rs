@@ -22,8 +22,18 @@ pub enum Error {
     Node(#[from] rg_poi::node::NodeError),
     #[error("keys: {0}")]
     Keys(#[from] rg_keys::Error),
-    #[error("seed root {0} is not in the contract's history")]
-    UnknownSeedRoot(String),
+    #[error("tree {0} root {1} is not in the contract's history")]
+    UnknownRoot(u32, String),
+    #[error("relay call {0} failed: {1}")]
+    CallFailed(u64, String),
+    #[error("the node's {0} is implausible")]
+    Implausible(&'static str),
+    #[error("the broadcaster answered with a transaction that is not this one")]
+    WrongTransaction,
+    #[error("the RPC URL must use https, or plain http to this machine")]
+    InsecureRpc,
+    #[error("the node is on chain {0}, not this network's chain {1}")]
+    WrongNode(u64, u64),
     #[error("{0} has no indexer and legacy events cannot be decoded")]
     NoSquid(&'static str),
     #[error("proof does not verify against the artifacts' key")]

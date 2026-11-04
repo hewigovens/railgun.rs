@@ -9,6 +9,7 @@ use rg_primitives::field::to_be_bytes;
 use rg_sync::abi;
 
 use crate::Error;
+use crate::plan::MAX_NOTE_VALUE;
 
 /// `proxy.shield([...])` for `value` of `token`, payable to `receiver`. The caller must have approved the proxy for `value`. `fill` supplies randomness.
 pub fn shield_calldata(
@@ -32,9 +33,12 @@ pub(crate) fn shield_request(
     value: u128,
     mut fill: impl FnMut(&mut [u8]),
 ) -> Result<abi::ShieldRequest, Error> {
-    let (mut shield_key, mut random, mut gcm_iv, mut ctr_iv) =
-        ([0u8; 32], [0u8; 16], [0u8; 16], [0u8; 16]);
-    fill(&mut shield_key);
+    if value > MAX_NOTE_VALUE {
+        return Err(Error::OutOfRange("value"));
+    }
+    let mut shield_key = rg_keys::Zeroizing::new([0u8; 32]);
+    let (mut random, mut gcm_iv, mut ctr_iv) = ([0u8; 16], [0u8; 16], [0u8; 16]);
+    fill(&mut *shield_key);
     fill(&mut random);
     fill(&mut gcm_iv);
     fill(&mut ctr_iv);

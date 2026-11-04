@@ -7,6 +7,7 @@ use rg_prover::ark_types::Proof;
 use rg_tx::{BroadcasterFee, TransferParams};
 use serde_json::{Map, Value, json};
 
+use crate::fee_quote::plausible_price;
 use crate::route::Route;
 use crate::{
     Artifacts, ChainStore, Client, CrossContractCalls, Error, POI_LIST, Transfer, Unshield,
@@ -20,6 +21,15 @@ const ESTIMATE_FROM: &str = "0x000000000000000000000000000000000000dEaD";
 const FEE_ROUNDS: usize = 5;
 
 const ANSWER_TIMEOUT: Duration = Duration::from_secs(120);
+
+/// Seconds to wait for the node to see a broadcaster's transaction before taking its word for the hash.
+const SUBMITTED_CHECKS: usize = 10;
+
+fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_millis() as u64)
+}
 
 /// A batch proved for one broadcaster to submit, with its fee note inside.
 #[derive(Clone, Debug)]
@@ -139,14 +149,19 @@ impl<S: ChainStore> Client<S> {
     ) -> Result<BroadcastTx, Error> {
         let broadcaster = decode_address(&offer.railgun_address)?;
         let through = route.relay_adapt();
-        if !offer.fees.contains_key(&token) || through.is_some() && offer.relay_adapt != through {
+        if !offer.fees.contains_key(&token)
+            || !offer.is_live(now_ms())
+            || through.is_some() && offer.relay_adapt != through
+        {
             return Err(Error::NotOffered);
         }
+        // Bounded, so the products below cannot overflow and a lying node cannot set the fee at will.
         let (gas_price, min_gas_price) = if self.network.broadcaster_min_gas_price {
-            let price = self.rpc.gas_price()?;
+            let price = plausible_price(self.rpc.gas_price()?)?;
             (price, price)
         } else {
-            (self.rpc.base_fee()? * 2 + self.rpc.priority_fee()?, 0)
+            let base_fee = plausible_price(self.rpc.base_fee()?)?;
+            (base_fee * 2 + plausible_price(self.rpc.priority_fee()?)?, 0)
         };
         let fee_of = |value| BroadcasterFee {
             recipient: broadcaster.clone(),
@@ -204,7 +219,7 @@ impl<S: ChainStore> Client<S> {
             .map(|p| Ok(p.prepare(keys)?.transaction(&Proof::default())))
             .collect::<Result<Vec<_>, Error>>()?;
         let data = format!("0x{}", hex::encode(route.estimate_calldata(txs)));
-        Ok(self.rpc.estimate_gas(ESTIMATE_FROM, route.to, 0, &data)?)
+        self.node_estimate(ESTIMATE_FROM, route.to, 0, &data)
     }
 
     /// Sends the batch to its broadcaster and waits for the hash of the transaction it submitted.
@@ -226,8 +241,26 @@ impl<S: ChainStore> Client<S> {
         };
         let sealed = request.seal(|b| rand::rngs::OsRng.fill_bytes(b))?;
         match broadcasters.submit(&sealed, ANSWER_TIMEOUT)? {
-            TransactResponse::Submitted(hash) => Ok(hash),
+            TransactResponse::Submitted(hash) => {
+                self.check_submitted(&hash, &tx.tx)?;
+                Ok(hash)
+            }
             TransactResponse::Refused(why) => Err(Error::Refused(why)),
         }
+    }
+
+    /// The hash is the broadcaster's word. When the node already has that transaction, it must carry this batch, or the broadcaster has answered with another one.
+    fn check_submitted(&self, hash: &[u8; 32], tx: &UnsignedTx) -> Result<(), Error> {
+        for _ in 0..SUBMITTED_CHECKS {
+            if let Some((to, data)) = self.rpc.transaction_call(hash)? {
+                return if to.eq_ignore_ascii_case(&tx.to) && data == tx.data {
+                    Ok(())
+                } else {
+                    Err(Error::WrongTransaction)
+                };
+            }
+            std::thread::sleep(Duration::from_secs(1));
+        }
+        Ok(())
     }
 }

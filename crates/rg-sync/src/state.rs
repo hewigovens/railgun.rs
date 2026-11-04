@@ -85,20 +85,25 @@ impl SyncState {
         self.trees.get(tree as usize).map(MerkleTree::root)
     }
 
-    fn tree_mut(&mut self, tree: u32) -> &mut MerkleTree {
-        while self.trees.len() <= tree as usize {
+    /// The contract opens trees one at a time, so a tree number past the next one is a forged or out-of-order log, and creating every tree up to it could exhaust memory.
+    fn tree_mut(&mut self, tree: u32) -> Result<&mut MerkleTree, Error> {
+        let tree = tree as usize;
+        if tree > self.trees.len() {
+            return Err(Error::Range("tree number"));
+        }
+        if tree == self.trees.len() {
             let t = MerkleTree::new();
-            let n = self.trees.len() as u32;
-            self.root_history.insert((n, field::to_be_bytes(&t.root())));
+            self.root_history
+                .insert((tree as u32, field::to_be_bytes(&t.root())));
             self.trees.push(t);
             self.leaves.push(Vec::new());
         }
-        &mut self.trees[tree as usize]
+        Ok(&mut self.trees[tree])
     }
 
     fn insert(&mut self, tree: u32, start: u32, leaves: Vec<Leaf>) -> Result<(), Error> {
         let hashes: Vec<Fr> = leaves.iter().map(|l| l.commitment.hash()).collect();
-        let t = self.tree_mut(tree);
+        let t = self.tree_mut(tree)?;
         t.insert(start as usize, &hashes)?;
         let root = field::to_be_bytes(&t.root());
         self.root_history.insert((tree, root));
@@ -249,6 +254,15 @@ mod tests {
         assert_eq!(state.root(0), Some(tree.root()));
         assert_eq!(state.leaves[1].len(), 1);
         assert!(state.is_known_root(0, &field::to_be_bytes(&tree.root())));
+    }
+
+    #[test]
+    fn a_tree_past_the_next_one_is_an_error() {
+        let text = format!("0 0 {}\n4000000000 0 {}\n", hash(1), hash(2));
+        let mut state = SyncState::new();
+        let err = state.seed_from_text(&text).unwrap_err();
+        assert!(matches!(err, Error::Range("tree number")));
+        assert_eq!(state.trees.len(), 1);
     }
 
     #[test]

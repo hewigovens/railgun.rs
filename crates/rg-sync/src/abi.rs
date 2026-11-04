@@ -150,4 +150,6 @@ sol! {
     function unwrapBase(uint256 _amount) external;
 
     function transfer(TokenTransfer[] _transfers) external;
+
+    error CallFailed(uint256 callIndex, bytes revertReason);
 }

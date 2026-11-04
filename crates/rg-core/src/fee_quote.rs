@@ -1,6 +1,35 @@
 use rg_keys::EvmAddress;
+use rg_tx::decode_call_failed;
+use serde_json::Value;
 
 use crate::{ChainStore, Client, Error, UnsignedTx};
+
+/// Far past any Railgun batch, so a node's estimate above it is a lie, and products with it cannot overflow.
+const MAX_GAS: u64 = 30_000_000;
+/// 10,000 gwei, far past any fee a chain has charged.
+const MAX_GAS_PRICE: u128 = 10_000_000_000_000;
+
+/// Rejects a gas price no honest node reports, which would otherwise make the fee whatever the node chose.
+pub(crate) fn plausible_price(price: u128) -> Result<u128, Error> {
+    if price > MAX_GAS_PRICE {
+        return Err(Error::Implausible("gas price"));
+    }
+    Ok(price)
+}
+
+/// A relay's `CallFailed` revert, from the node's error, as which call failed and why.
+fn call_failed(error: rg_sync::Error) -> Error {
+    let rg_sync::Error::Refused(ref detail) = error else {
+        return error.into();
+    };
+    let revert = serde_json::from_str::<Value>(detail)
+        .ok()
+        .and_then(|v| hex::decode(v["data"].as_str()?.trim_start_matches("0x")).ok());
+    match revert.as_deref().and_then(decode_call_failed) {
+        Some((index, reason)) => Error::CallFailed(index, reason),
+        None => error.into(),
+    }
+}
 
 /// What sending a transaction may cost, fixed before signing so the user approves the limit that is signed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -28,12 +57,30 @@ impl FeeQuote {
 }
 
 impl<S: ChainStore> Client<S> {
+    /// The node's gas estimate, with a failed relay call named and an implausible estimate rejected.
+    pub(crate) fn node_estimate(
+        &self,
+        from: &str,
+        to: &str,
+        value: u128,
+        data: &str,
+    ) -> Result<u64, Error> {
+        let gas = self
+            .rpc
+            .estimate_gas(from, to, value, data)
+            .map_err(call_failed)?;
+        if gas > MAX_GAS {
+            return Err(Error::Implausible("gas estimate"));
+        }
+        Ok(gas)
+    }
+
     /// Estimates gas for `from` sending `tx` and prices it at the current fees.
     pub fn quote_fee(&self, from: &[u8; 20], tx: &UnsignedTx) -> Result<FeeQuote, Error> {
         self.check_chain(tx)?;
         let gas_estimate = self.estimate_gas(&EvmAddress(*from).to_string(), tx)?;
-        let base_fee_per_gas = self.rpc.base_fee()?;
-        let max_priority_fee_per_gas = self.rpc.priority_fee()?;
+        let base_fee_per_gas = plausible_price(self.rpc.base_fee()?)?;
+        let max_priority_fee_per_gas = plausible_price(self.rpc.priority_fee()?)?;
         Ok(FeeQuote {
             gas_estimate,
             gas_limit: gas_estimate + gas_estimate / 5,

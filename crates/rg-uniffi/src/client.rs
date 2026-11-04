@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use rg_core::{
     Artifacts, Client, FileStore, Receipt, Shield, Transfer, Unshield, UnshieldBaseToken,
@@ -37,8 +37,11 @@ pub struct RailgunClient {
 }
 
 impl RailgunClient {
-    fn client(&self) -> MutexGuard<'_, Client> {
-        self.client.lock().unwrap_or_else(PoisonError::into_inner)
+    /// A panic mid-call can leave the chain state half applied, so a poisoned client refuses further calls rather than serve it; open a new one.
+    fn client(&self) -> Result<MutexGuard<'_, Client>, RailgunError> {
+        self.client.lock().map_err(|_| RailgunError::Internal {
+            reason: "an earlier call failed midway; open the client again".into(),
+        })
     }
 }
 
@@ -62,19 +65,19 @@ impl RailgunClient {
     }
 
     pub fn sync(&self) -> Result<SyncReport, RailgunError> {
-        Ok(self.client().sync()?)
+        Ok(self.client()?.sync()?)
     }
 
     /// Unspent ERC20 balances as of the last sync, by POI status, which comes from the aggregator. Token addresses are checksummed.
     pub fn balances(&self, wallet: &Wallet) -> Result<Vec<TokenBalance>, RailgunError> {
-        let balances = self.client().balances(wallet.view())?;
+        let balances = self.client()?.balances(wallet.view())?;
         Ok(balances.into_iter().map(TokenBalance::from).collect())
     }
 
     /// Shields, receipts, sends and unshields as of the last sync, newest first. Change is left out.
-    pub fn history(&self, wallet: &Wallet) -> Vec<HistoryItem> {
-        let history = self.client().history(wallet.view());
-        history.into_iter().map(HistoryItem::from).collect()
+    pub fn history(&self, wallet: &Wallet) -> Result<Vec<HistoryItem>, RailgunError> {
+        let history = self.client()?.history(wallet.view());
+        Ok(history.into_iter().map(HistoryItem::from).collect())
     }
 
     pub fn build_transfer(
@@ -92,7 +95,7 @@ impl RailgunClient {
             memo: memo.as_deref(),
         };
         let tx = self
-            .client()
+            .client()?
             .build_transfer(wallet.spending()?, &transfer, &self.artifacts)?;
         Ok(tx.into())
     }
@@ -110,7 +113,7 @@ impl RailgunClient {
             value: amount(&value)?,
         };
         let tx = self
-            .client()
+            .client()?
             .build_unshield(wallet.spending()?, &unshield, &self.artifacts)?;
         Ok(tx.into())
     }
@@ -126,7 +129,7 @@ impl RailgunClient {
             to: address(&to)?,
             value: amount(&value)?,
         };
-        let tx = self.client().build_unshield_base_token(
+        let tx = self.client()?.build_unshield_base_token(
             wallet.spending()?,
             &unshield,
             &self.artifacts,
@@ -140,7 +143,7 @@ impl RailgunClient {
         wallet: &Wallet,
         calls: CrossContractCalls,
     ) -> Result<UnsignedTx, RailgunError> {
-        let tx = self.client().build_cross_contract_calls(
+        let tx = self.client()?.build_cross_contract_calls(
             wallet.spending()?,
             &calls.to_core()?,
             &self.artifacts,
@@ -155,7 +158,7 @@ impl RailgunClient {
         value: String,
     ) -> Result<UnsignedTx, RailgunError> {
         let tx = self
-            .client()
+            .client()?
             .build_shield_base_token(&receiver, amount(&value)?)?;
         Ok(tx.into())
     }
@@ -172,13 +175,13 @@ impl RailgunClient {
             token: address(&token)?,
             value: amount(&value)?,
         };
-        Ok(self.client().build_shield(&shield)?.into())
+        Ok(self.client()?.build_shield(&shield)?.into())
     }
 
     /// Lets the Railgun contract take `value` of `token`.
     pub fn build_approve(&self, token: String, value: String) -> Result<UnsignedTx, RailgunError> {
         let tx = self
-            .client()
+            .client()?
             .build_approve(address(&token)?, amount(&value)?)?;
         Ok(tx.into())
     }
@@ -186,25 +189,30 @@ impl RailgunClient {
     /// What the Railgun contract may take of `owner`'s `token`.
     pub fn allowance(&self, owner: String, token: String) -> Result<String, RailgunError> {
         let allowance = self
-            .client()
+            .client()?
             .allowance(&address(&owner)?, &address(&token)?)?;
         Ok(allowance.to_string())
     }
 
     pub fn token_balance(&self, owner: String, token: String) -> Result<String, RailgunError> {
         let balance = self
-            .client()
+            .client()?
             .token_balance(&address(&token)?, &address(&owner)?)?;
         Ok(balance.to_string())
     }
 
     pub fn native_balance(&self, owner: String) -> Result<String, RailgunError> {
-        Ok(self.client().native_balance(&address(&owner)?)?.to_string())
+        Ok(self
+            .client()?
+            .native_balance(&address(&owner)?)?
+            .to_string())
     }
 
     /// Estimates and prices sending `tx` from the `from` address, which needs no key. Fails if the node expects it to revert.
     pub fn quote_fee(&self, from: String, tx: UnsignedTx) -> Result<Arc<FeeQuote>, RailgunError> {
-        let quote = self.client().quote_fee(&address(&from)?, &tx.try_into()?)?;
+        let quote = self
+            .client()?
+            .quote_fee(&address(&from)?, &tx.try_into()?)?;
         Ok(Arc::new(FeeQuote { quote }))
     }
 
@@ -216,14 +224,14 @@ impl RailgunClient {
         fee: &FeeQuote,
     ) -> Result<String, RailgunError> {
         let hash = self
-            .client()
+            .client()?
             .send(&account.key, &tx.try_into()?, &fee.quote)?;
         Ok(format!("0x{}", hex::encode(hash)))
     }
 
     /// None until the transaction is mined.
     pub fn receipt(&self, tx_hash: String) -> Result<Option<Receipt>, RailgunError> {
-        Ok(self.client().receipt(&hash(&tx_hash)?)?)
+        Ok(self.client()?.receipt(&hash(&tx_hash)?)?)
     }
 
     /// Proves a transfer for `offer`'s broadcaster to submit, which pays gas so no public account shows. Its fee comes from the private balance, in the same token.
@@ -242,7 +250,7 @@ impl RailgunClient {
             value: amount(&value)?,
             memo: memo.as_deref(),
         };
-        let tx = self.client().build_broadcast_transfer(
+        let tx = self.client()?.build_broadcast_transfer(
             wallet.spending()?,
             &transfer,
             &offer.offer,
@@ -265,7 +273,7 @@ impl RailgunClient {
             token: address(&token)?,
             value: amount(&value)?,
         };
-        let tx = self.client().build_broadcast_unshield(
+        let tx = self.client()?.build_broadcast_unshield(
             wallet.spending()?,
             &unshield,
             &offer.offer,
@@ -286,7 +294,7 @@ impl RailgunClient {
             to: address(&to)?,
             value: amount(&value)?,
         };
-        let tx = self.client().build_broadcast_unshield_base_token(
+        let tx = self.client()?.build_broadcast_unshield_base_token(
             wallet.spending()?,
             &unshield,
             &offer.offer,
@@ -302,7 +310,7 @@ impl RailgunClient {
         calls: CrossContractCalls,
         offer: &BroadcasterOffer,
     ) -> Result<Arc<BroadcastTransaction>, RailgunError> {
-        let tx = self.client().build_broadcast_cross_contract_calls(
+        let tx = self.client()?.build_broadcast_cross_contract_calls(
             wallet.spending()?,
             &calls.to_core()?,
             &offer.offer,
@@ -317,7 +325,7 @@ impl RailgunClient {
         broadcasters: &RailgunBroadcasters,
         tx: &BroadcastTransaction,
     ) -> Result<String, RailgunError> {
-        let hash = self.client().broadcast(&mut broadcasters.lock(), &tx.tx)?;
+        let hash = self.client()?.broadcast(&mut broadcasters.lock(), &tx.tx)?;
         Ok(format!("0x{}", hex::encode(hash)))
     }
 
@@ -328,18 +336,18 @@ impl RailgunClient {
         tx_hash: String,
     ) -> Result<Arc<PoiSubmission>, RailgunError> {
         let proof =
-            self.client()
+            self.client()?
                 .prove_poi(wallet.spending()?, &hash(&tx_hash)?, &self.artifacts)?;
         Ok(Arc::new(PoiSubmission { proof }))
     }
 
     pub fn submit_poi(&self, submission: &PoiSubmission) -> Result<(), RailgunError> {
-        Ok(self.client().submit_poi(&submission.proof)?)
+        Ok(self.client()?.submit_poi(&submission.proof)?)
     }
 
     /// True once the aggregator lists every output as valid.
     pub fn poi_is_valid(&self, submission: &PoiSubmission) -> Result<bool, RailgunError> {
-        let status = self.client().poi_status(&submission.proof)?;
+        let status = self.client()?.poi_status(&submission.proof)?;
         Ok(status.len() == submission.proof.blinded.len() && status.values().all(|s| s == "Valid"))
     }
 }

@@ -58,14 +58,16 @@ pub struct Balance {
 
 impl Balance {
     fn add(&mut self, status: NoteStatus, value: u128) {
-        *match status {
+        let total = match status {
             NoteStatus::Spendable => &mut self.spendable,
             NoteStatus::ShieldPending => &mut self.shield_pending,
             NoteStatus::ShieldBlocked => &mut self.shield_blocked,
             NoteStatus::ProofSubmitted => &mut self.proof_submitted,
             NoteStatus::MissingInternal => &mut self.missing_internal,
             NoteStatus::MissingExternal => &mut self.missing_external,
-        } += value;
+        };
+        // Notes are 120 bits, so only a flood of fake ones could overflow; saturate rather than wrap.
+        *total = total.saturating_add(value);
     }
 }
 

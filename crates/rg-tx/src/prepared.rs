@@ -77,7 +77,8 @@ impl TransferParams<'_> {
         }
         let bound_params = abi::BoundParams {
             treeNumber: p.tree,
-            minGasPrice: alloy_primitives::Uint::from(p.min_gas_price),
+            minGasPrice: alloy_primitives::Uint::try_from(p.min_gas_price)
+                .map_err(|_| Error::OutOfRange("min gas price"))?,
             unshield: u8::from(p.unshield.is_some()),
             chainID: p.chain_id,
             adaptContract: Address::from(p.adapt.contract),

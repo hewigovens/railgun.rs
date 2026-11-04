@@ -5,6 +5,8 @@
 pub mod abi;
 mod error;
 pub mod events;
+#[cfg(feature = "rpc")]
+mod http;
 pub mod log;
 pub mod network;
 #[cfg(feature = "rpc")]

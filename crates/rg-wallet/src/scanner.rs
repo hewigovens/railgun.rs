@@ -6,6 +6,10 @@ use rg_sync::{Commitment, Leaf, SyncState};
 
 use crate::{ScanResult, SentNote, Txo, TxoSource};
 
+fn is_canonical(bytes: &[u8; 32]) -> bool {
+    field::to_be_bytes(&field::from_be_bytes_mod_order(bytes)) == *bytes
+}
+
 pub struct Scanner<'a> {
     keys: &'a ViewOnlyKeys,
     viewing: ViewingKeys<'a>,
@@ -101,8 +105,10 @@ impl<'a> Scanner<'a> {
             }
             Commitment::Opaque(_) => {}
             Commitment::Transact(t) => {
+                // The commitment reduces the token hash, so a sender could write an unreduced one that still matches and file the note under a token that does not exist.
                 if let Ok(n) = decrypt_as_receiver(&self.viewing, &t.ciphertext)
                     && n.commitment() == leaf_hash
+                    && is_canonical(&n.token_hash)
                 {
                     let txo = self.txo(
                         state,
@@ -149,4 +155,20 @@ struct TxoFields {
     source: TxoSource,
     memo_text: Option<String>,
     sender: Option<Fr>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_token_hash_past_the_modulus_is_not_canonical() {
+        let mut token = [0u8; 32];
+        token[12..].copy_from_slice(&[0xaf; 20]);
+        assert!(is_canonical(&token));
+        // BN254's scalar modulus, which reduces to zero: the same field element as the zero hash.
+        let p = hex::decode("30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001")
+            .unwrap();
+        assert!(!is_canonical(&p.try_into().unwrap()));
+    }
 }
