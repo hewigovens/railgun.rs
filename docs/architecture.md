@@ -165,8 +165,8 @@ and a token listed twice is unshielded once. The caller builds the calls, approv
 included, since they run from RelayAdapt's address, and the gas limit is at least
 3,200,000. A relay call that fails a gas estimate comes back as its index and reason. The action's
 `minGasLimit` is the requested gas less 150,000, and the relay checks `gasleft()` against
-it, so a broadcaster cannot starve the calls. A self-sent relay requires every call to
-succeed.
+it, so a broadcaster cannot starve the calls; through a broadcaster it is raised to cover
+a batch that needs more. A self-sent relay requires every call to succeed.
 
 ## A broadcast transfer
 
@@ -213,10 +213,14 @@ the fee note is in wrapped ETH. Only offers whose `relayAdapt` is this network's
 RelayAdapt are taken. The nullifiers, and so the relay hash the transactions commit to,
 change with every re-plan, so each round binds them again before estimating. Broadcasters
 refuse a relay whose calls must succeed, so, as in the engine, a failed unwrap or send
-leaves the ETH in RelayAdapt. The gas estimate requires the calls to succeed, so a
-recipient that refuses ETH fails it before anything is sent. Cross-contract calls go the
-same way, with the fee in the first token unshielded; if a call fails once sent, the fee
-is still paid and the shields return what RelayAdapt holds.
+leaves the ETH in RelayAdapt, where anyone can take it. A broadcaster could make them fail
+by sending enough gas for the transactions and its fee but not for the calls, so the
+action's `minGasLimit` is at least the gas the whole batch takes, estimated with it at
+zero; for cross-contract calls it is the larger of that and the requested gas less
+150,000. The gas estimate requires the calls to succeed, so a recipient that refuses ETH
+fails it before anything is sent. Cross-contract calls go the same way, with the fee in
+the first token unshielded; if a call fails once sent, the fee is still paid and the
+shields return what RelayAdapt holds.
 
 A transfer or unshield split into several transactions also goes through RelayAdapt, with
 no calls: sent straight to the Railgun contract, each transaction could be submitted alone,
@@ -228,9 +232,10 @@ A broadcaster can sit on a batch, answer with nothing or a hash no node has, and
 it later. So `Client::broadcast` holds the batch's notes in the store before handing it
 over, and a later spend of the same token, from either path, must spend one of them too:
 at most one of the two lands. When the held notes cannot cover it, planning fails with
-`HeldByBroadcaster`. A sync that sees any of a batch's notes spent lets go of it, and
-`Client::forget_pending_broadcasts` lets go of all of them for a user who accepts both
-landing.
+`HeldByBroadcaster`. A note stays held when the aggregator stops counting it spendable,
+since the broadcaster can still submit it. A sync that sees any of a batch's notes spent
+lets go of it, and `Client::forget_pending_broadcasts` lets go of all of them for a user
+who accepts both landing.
 
 `Waku` is a light client. It never joins the relay mesh. It reads offers and answers
 with store queries, and hands requests to a node with light push. It finds nodes through

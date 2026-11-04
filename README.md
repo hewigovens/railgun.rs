@@ -9,8 +9,8 @@ It is a library first. It replaces the TS engine and wallet SDK for apps that wo
 rather not ship Node.js, and its bytes match theirs. There is no app here; the `wallet`
 example is a command line over the API.
 
-> **Experimental and unaudited.** It has moved real funds on Arbitrum, but nobody has
-> reviewed it for security. Use small amounts.
+> **Experimental.** It has moved real funds on Arbitrum. Codex and Claude have reviewed
+> it for security; no human has audited it. Use small amounts.
 
 ## What works
 

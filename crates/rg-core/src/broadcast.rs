@@ -100,7 +100,7 @@ impl<S: ChainStore> Client<S> {
         )
     }
 
-    /// Plans and proves an unshield of wrapped ETH that arrives at `unshield.to` as ETH, through RelayAdapt, for `offer`'s broadcaster to submit. It is paid in wrapped ETH, and must submit through this network's RelayAdapt. As in the engine, the unwrap and send may fail without reverting, which leaves the ETH in RelayAdapt, so `to` must accept ETH.
+    /// Plans and proves an unshield of wrapped ETH that arrives at `unshield.to` as ETH, through RelayAdapt, for `offer`'s broadcaster to submit. It is paid in wrapped ETH, and must submit through this network's RelayAdapt. As in the engine, the unwrap and send may fail without reverting, which leaves the ETH in RelayAdapt, so `to` must accept ETH. The relay must be sent with all the gas they need.
     pub fn build_broadcast_unshield_base_token(
         &self,
         keys: &WalletKeys,
@@ -178,26 +178,27 @@ impl<S: ChainStore> Client<S> {
         };
         let plan_bound = |fee| {
             let mut planned = plan(fee_of(fee), min_gas_price)?;
-            route_for(&planned).bind(keys, &mut planned);
-            Ok::<_, Error>(planned)
+            let route = self.gas_floor(keys, &planned, route_for(&planned))?;
+            route.bind(keys, &mut planned);
+            let gas_estimate = self.estimate_unproved(keys, &planned, &route)?;
+            Ok::<_, Error>((planned, route, gas_estimate))
         };
-        let mut planned = plan_bound(0)?;
-        let mut gas_estimate = self.estimate_unproved(keys, &planned, route_for(&planned))?;
+        let (mut planned, mut route, mut gas_estimate) = plan_bound(0)?;
         let mut fee = 0;
         for _ in 0..FEE_ROUNDS {
             let gas_limit = u128::from(gas_estimate + gas_estimate / 5);
             fee = offer
                 .fee(&token, gas_limit * gas_price)
                 .ok_or(Error::NotOffered)?;
-            let next = plan_bound(fee)?;
+            let (next, next_route, next_estimate) = plan_bound(fee)?;
             let same = shape(&next) == shape(&planned);
-            planned = next;
+            (planned, route) = (next, next_route);
             if same {
                 break;
             }
-            gas_estimate = self.estimate_unproved(keys, &planned, route_for(&planned))?;
+            gas_estimate = next_estimate;
         }
-        let route = route_for(&planned);
+        let route = &route;
         let through = route.relay_adapt();
         if through.is_some() && offer.relay_adapt != through {
             return Err(Error::NotOffered);
@@ -228,6 +229,20 @@ impl<S: ChainStore> Client<S> {
         let action = bind_together_action(random);
         let relay_adapt = address(self.network.relay_adapt)?;
         Ok(Route::relay(self.network.relay_adapt, relay_adapt, action))
+    }
+
+    /// `route`, requiring at least the gas the whole batch takes to be left when the relay starts, so a broadcaster cannot send enough for the transactions and its fee but too little for the calls.
+    fn gas_floor(
+        &self,
+        keys: &WalletKeys,
+        planned: &[TransferParams],
+        route: &Route,
+    ) -> Result<Route, Error> {
+        if !route.has_calls() {
+            return Ok(route.clone());
+        }
+        let needs = self.estimate_unproved(keys, planned, &route.with_min_gas_limit(0))?;
+        Ok(route.with_min_gas_limit(needs.max(route.min_gas_limit())))
     }
 
     /// Gas for the batch with empty proofs, sent from the address the contract does not check proofs for. It fails if a relay's calls would.
@@ -286,5 +301,60 @@ impl<S: ChainStore> Client<S> {
             std::thread::sleep(Duration::from_secs(1));
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+
+    use rg_sync::Network;
+
+    use super::*;
+    use crate::FileStore;
+
+    /// A node that answers every request with `gas` as its estimate.
+    fn node(gas: u64) -> String {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        std::thread::spawn(move || {
+            for mut stream in listener.incoming().flatten() {
+                let _ = stream.read(&mut [0; 1 << 16]);
+                let body = format!(r#"{{"jsonrpc":"2.0","id":1,"result":"0x{gas:x}"}}"#);
+                let _ = write!(
+                    stream,
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    body.len()
+                );
+            }
+        });
+        url
+    }
+
+    #[test]
+    fn a_relay_with_calls_must_start_with_the_gas_the_batch_takes() {
+        let dir = std::env::temp_dir().join(format!("rg-core-floor-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let store = FileStore::open(&dir).unwrap();
+        let client = Client::open(Network::ARBITRUM, &node(700_000), store).unwrap();
+        let keys = WalletKeys::from_mnemonic(
+            "test test test test test test test test test test test junk",
+            "",
+            0,
+        )
+        .unwrap();
+        let unshield = UnshieldBaseToken {
+            to: [1; 20],
+            value: 1,
+        };
+        let (_, to_eth) = client.base_token_route(&unshield, false).unwrap();
+        let floored = client.gas_floor(&keys, &[], &to_eth).unwrap();
+        assert_eq!(floored.min_gas_limit(), 700_000);
+
+        let together = client.bound_together_route().unwrap();
+        let floored = client.gas_floor(&keys, &[], &together).unwrap();
+        assert_eq!(floored.min_gas_limit(), 0);
+        std::fs::remove_dir_all(dir).unwrap();
     }
 }

@@ -49,16 +49,18 @@ impl<S: ChainStore> Client<S> {
         self.store.save_pending_spends(&[])
     }
 
-    /// A later spend of a token a held batch spends must spend one of that batch's notes too, so at most one of the two lands. Re-plans from the held notes alone when the first plan does not.
+    /// A later spend of a token a held batch spends must spend one of that batch's notes too, so at most one of the two lands. Re-plans from the held notes alone when the first plan does not. `scan` has every unspent note, `spendable` only those that may be spent now.
     pub(crate) fn spend_held_notes_first<'a>(
         &self,
         keys: &WalletKeys,
         token_hash: &[u8; 32],
+        scan: &ScanResult,
         spendable: &ScanResult,
         planned: Vec<TransferParams<'a>>,
         plan: impl Fn(&ScanResult) -> Result<Vec<TransferParams<'a>>, rg_tx::Error>,
     ) -> Result<Vec<TransferParams<'a>>, Error> {
-        let of_token: HashSet<Spend> = spendable
+        // A held note that loses its POI status is still unspent on chain, so the broadcaster can still submit its batch.
+        let of_token: HashSet<Spend> = scan
             .unspent()
             .filter(|t| &t.token_hash == token_hash)
             .map(|t| (t.tree as u16, t.nullifier))
@@ -174,22 +176,33 @@ mod tests {
             txos: vec![small.clone(), large.clone()],
             sent: Vec::new(),
         };
-        let spends_of = |client: &Client, value| {
-            let planned = plan(&scan, value).unwrap();
+        let spends_of = |client: &Client, spendable: &ScanResult, value| {
+            let planned = plan(spendable, value).unwrap();
             client
-                .spend_held_notes_first(&keys, &TOKEN, &scan, planned, |s| plan(s, value))
+                .spend_held_notes_first(&keys, &TOKEN, &scan, spendable, planned, |s| {
+                    plan(s, value)
+                })
                 .map(|p| spends(&keys, &p))
         };
         let large_spend = (0, large.nullifier);
 
         client.hold(&[large_spend]).unwrap();
         // 5 alone would take the small note; the held large one covers it too.
-        assert_eq!(spends_of(&client, 5).unwrap(), vec![large_spend]);
+        assert_eq!(spends_of(&client, &scan, 5).unwrap(), vec![large_spend]);
 
         client.forget_pending_broadcasts().unwrap();
         client.hold(&[(0, small.nullifier)]).unwrap();
         assert!(matches!(
-            spends_of(&client, 15),
+            spends_of(&client, &scan, 15),
+            Err(Error::HeldByBroadcaster)
+        ));
+        // The held small note lost its POI status: the large one alone would pay, but the held batch can still land.
+        let large_only = ScanResult {
+            txos: vec![large.clone()],
+            sent: Vec::new(),
+        };
+        assert!(matches!(
+            spends_of(&client, &large_only, 5),
             Err(Error::HeldByBroadcaster)
         ));
 

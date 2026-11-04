@@ -45,6 +45,10 @@ engine accepts. Missing features are in the README under "Not supported yet".
 - A broadcaster relay's gas estimate requires its calls to succeed. The engine does so for
   cross-contract calls but not for an unshield to ETH, where a recipient that refuses ETH
   only shows once the broadcaster has sent it and the ETH sits in RelayAdapt.
+- A broadcaster's relay with calls, an unshield to ETH or cross-contract calls, has a
+  `minGasLimit` of at least the gas the whole batch takes. The engine leaves it at zero for
+  an unshield to ETH, so a broadcaster can send too little gas for the unwrap and send,
+  keep its fee, and take the ETH left in RelayAdapt.
 - A broadcast transfer or unshield split into several transactions goes through
   RelayAdapt with no calls, which binds them together; the engine sends them straight to
   the Railgun contract, where a broadcaster could submit only the one with its fee.

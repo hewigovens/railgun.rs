@@ -9,6 +9,7 @@ publish.workspace = true
 description = "The wallet API the bindings sit on: chain store, sync, transfers and POI"
 
 [dependencies]
+alloy-primitives.workspace = true
 brotli.workspace = true
 hex.workspace = true
 rand.workspace = true

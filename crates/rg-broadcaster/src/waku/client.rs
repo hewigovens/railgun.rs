@@ -33,6 +33,33 @@ pub struct WakuMessage {
     pub timestamp_ns: i64,
 }
 
+impl StoreQueryResponse {
+    /// Its messages and the cursor to the next page. A peer may put any number in a page, and keeping more than were asked for would let it fill memory.
+    fn page(self, limit: u64) -> Result<(Vec<WakuMessage>, Option<Vec<u8>>), Error> {
+        if self.status_code != Some(200) {
+            return Err(Error::Waku(format!(
+                "store: {}",
+                self.status_desc.unwrap_or_default()
+            )));
+        }
+        if self.messages.len() as u64 > limit {
+            return Err(Error::Waku("store: more messages than asked for".into()));
+        }
+        let messages = self
+            .messages
+            .into_iter()
+            .filter_map(|kv| {
+                let m = kv.message?;
+                Some(WakuMessage {
+                    payload: m.payload,
+                    timestamp_ns: m.timestamp.unwrap_or(0),
+                })
+            })
+            .collect();
+        Ok((messages, self.pagination_cursor))
+    }
+}
+
 #[derive(NetworkBehaviour)]
 struct Behaviour {
     store: rr::Behaviour<ProtoCodec<StoreQueryRequest, StoreQueryResponse>>,
@@ -245,20 +272,9 @@ impl Waku {
             else {
                 unreachable!("a store request gets a store answer");
             };
-            if response.status_code != Some(200) {
-                return Err(Error::Waku(format!(
-                    "store: {}",
-                    response.status_desc.unwrap_or_default()
-                )));
-            }
-            messages.extend(response.messages.into_iter().filter_map(|kv| {
-                let m = kv.message?;
-                Some(WakuMessage {
-                    payload: m.payload,
-                    timestamp_ns: m.timestamp.unwrap_or(0),
-                })
-            }));
-            cursor = response.pagination_cursor;
+            let (page, next) = response.page(PAGE)?;
+            messages.extend(page);
+            cursor = next;
             if cursor.is_none() {
                 break;
             }
@@ -302,5 +318,34 @@ impl Waku {
             }
         }
         Err(last)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::waku::proto::{MessageKeyValue, WakuMessage as Stored};
+
+    #[test]
+    fn a_store_page_with_more_messages_than_asked_for_is_refused() {
+        let response = |n| StoreQueryResponse {
+            status_code: Some(200),
+            messages: vec![
+                MessageKeyValue {
+                    message: Some(Stored::default()),
+                    ..MessageKeyValue::default()
+                };
+                n
+            ],
+            ..StoreQueryResponse::default()
+        };
+        assert_eq!(
+            response(PAGE as usize).page(PAGE).unwrap().0.len(),
+            PAGE as usize
+        );
+        assert!(matches!(
+            response(PAGE as usize + 1).page(PAGE),
+            Err(Error::Waku(_))
+        ));
     }
 }

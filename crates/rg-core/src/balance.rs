@@ -122,17 +122,20 @@ impl<S: ChainStore> Client<S> {
     }
 
     /// The scan with only spendable notes left unspent, for choosing what a transaction spends: a note without POI can be spent on chain, but the POI proof for that transaction would then fail.
-    pub(crate) fn spendable_scan(&self, keys: &ViewOnlyKeys) -> Result<ScanResult, Error> {
-        let scan = self.scan(keys);
+    pub(crate) fn spendable_scan(
+        &self,
+        keys: &ViewOnlyKeys,
+        scan: &ScanResult,
+    ) -> Result<ScanResult, Error> {
         let spendable: Vec<Txo> = self
-            .note_statuses(keys, &scan)?
+            .note_statuses(keys, scan)?
             .into_iter()
             .filter(|(_, status)| *status == NoteStatus::Spendable)
             .map(|(t, _)| t.clone())
             .collect();
         Ok(ScanResult {
             txos: spendable,
-            sent: scan.sent,
+            sent: scan.sent.clone(),
         })
     }
 }

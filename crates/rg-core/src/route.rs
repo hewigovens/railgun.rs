@@ -1,8 +1,10 @@
+use alloy_primitives::U256;
 use rg_keys::WalletKeys;
 use rg_sync::abi;
 use rg_tx::{AdaptId, TransferParams, relay_adapt_params, relay_calldata, transact_calldata};
 
 /// Where a batch is sent: straight to the Railgun contract, or to RelayAdapt with an action bound into every transaction.
+#[derive(Clone)]
 pub(crate) struct Route {
     pub(crate) to: &'static str,
     relay: Option<([u8; 20], abi::ActionData)>,
@@ -26,6 +28,28 @@ impl Route {
     /// The RelayAdapt contract the batch goes through, if any.
     pub(crate) fn relay_adapt(&self) -> Option<[u8; 20]> {
         self.relay.as_ref().map(|(contract, _)| *contract)
+    }
+
+    /// Calls RelayAdapt makes after the transactions. A broadcaster's relay lets them fail without reverting, so too little gas leaves what they would move in RelayAdapt, where anyone can take it.
+    pub(crate) fn has_calls(&self) -> bool {
+        self.relay
+            .as_ref()
+            .is_some_and(|(_, action)| !action.calls.is_empty())
+    }
+
+    /// The gas RelayAdapt requires left when the relay starts.
+    pub(crate) fn min_gas_limit(&self) -> u64 {
+        self.relay
+            .as_ref()
+            .map_or(0, |(_, action)| action.minGasLimit.saturating_to())
+    }
+
+    pub(crate) fn with_min_gas_limit(&self, gas: u64) -> Route {
+        let mut route = self.clone();
+        if let Some((_, action)) = &mut route.relay {
+            action.minGasLimit = U256::from(gas);
+        }
+        route
     }
 
     /// Commits each transaction to the action and its batch's nullifiers, so only RelayAdapt can submit them, and only with that action.
