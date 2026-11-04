@@ -16,6 +16,9 @@
 //!   broadcast-transfer <recipient 0zk> <token> <value> [--send]
 //!   broadcast-unshield <to> <token> <value> [--send]  through the cheapest broadcaster, which pays gas:
 //!   broadcast-unshield-eth <to> <value> [--send]      proves and prints the fee, and with --send hands it over
+//!   swap <token in> <value> <token out> <pool fee> <min out> [--broadcast [--send]]
+//!                                                     Uniswap V3 on Arbitrum through RelayAdapt, shielding the result back;
+//!                                                     prints the call, or with --broadcast goes through a broadcaster as above
 //!
 //! An EVM key file holds one `0x` hex private key. That account pays gas and is public.
 //!   poi <tx hash> [--submit | --full]
@@ -25,8 +28,9 @@
 use std::path::Path;
 
 use rg_core::{
-    Artifacts, BroadcasterFees, Broadcasters, ChainStore, Client, FileStore, POI_LIST, Receipt,
-    Shield, Transfer, Unshield, UnshieldBaseToken, UnsignedTx, Waku,
+    Artifacts, BroadcastTx, BroadcasterFees, Broadcasters, CROSS_CONTRACT_MIN_GAS_LIMIT,
+    ChainStore, Client, ContractCall, CrossContractCalls, FileStore, POI_LIST, Receipt, Shield,
+    Transfer, Unshield, UnshieldBaseToken, UnsignedTx, Waku,
 };
 use rg_keys::{EvmAddress, EvmKey, WalletKeys, Zeroizing};
 use rg_sync::Network;
@@ -75,6 +79,10 @@ fn read_tx(path: &str, chain_id: u64) -> Result<UnsignedTx, Box<dyn std::error::
     })
 }
 
+fn address(s: &str) -> Result<[u8; 20], Box<dyn std::error::Error>> {
+    Ok(s.parse::<EvmAddress>()?.0)
+}
+
 fn token(hash: &[u8; 32]) -> Result<EvmAddress, Box<dyn std::error::Error>> {
     Ok(EvmAddress(hash[12..].try_into()?))
 }
@@ -113,6 +121,24 @@ fn now_ms() -> u64 {
         .map_or(0, |d| d.as_millis() as u64)
 }
 
+/// Prints the fee, and with `--send` last hands the batch to its broadcaster.
+fn hand_over<S: ChainStore>(
+    client: &Client<S>,
+    broadcasters: &mut Broadcasters,
+    offer: &BroadcasterFees,
+    tx: &BroadcastTx,
+    a: &[String],
+) -> Result<(), Box<dyn std::error::Error>> {
+    println!(
+        "fee {} to {} ({} gas at {} wei)",
+        tx.fee, offer.railgun_address, tx.gas_estimate, tx.gas_price
+    );
+    if a.last().map(String::as_str) == Some("--send") {
+        println!("0x{}", hex::encode(client.broadcast(broadcasters, tx)?));
+    }
+    Ok(())
+}
+
 /// `broadcasters`, `broadcast-transfer`, `broadcast-unshield` and `broadcast-unshield-eth`.
 fn broadcast_command<S: ChainStore>(
     client: &Client<S>,
@@ -123,13 +149,11 @@ fn broadcast_command<S: ChainStore>(
     let network = Network::by_name(&a[1]).ok_or("unknown network")?;
     let mut broadcasters = Broadcasters::new(Waku::railgun()?, network.chain_id);
     let eth = a[5] == "broadcast-unshield-eth";
-    let token = match a[5].as_str() {
+    let token = address(match a[5].as_str() {
         "broadcasters" => &a[6],
         "broadcast-unshield-eth" => network.wrapped_token,
         _ => &a[7],
-    }
-    .parse::<EvmAddress>()?
-    .0;
+    })?;
     if a[5] == "broadcasters" {
         let mut live: Vec<BroadcasterFees> = broadcasters
             .offers()?
@@ -146,13 +170,13 @@ fn broadcast_command<S: ChainStore>(
         }
         return Ok(());
     }
-    let relay_adapt = network.relay_adapt.parse::<EvmAddress>()?.0;
+    let relay_adapt = address(network.relay_adapt)?;
     let offer = broadcasters
         .best_offer(&token, POI_LIST, eth.then_some(&relay_adapt))?
         .ok_or("no live broadcaster takes this token")?;
     let tx = if eth {
         let unshield = UnshieldBaseToken {
-            to: a[6].parse::<EvmAddress>()?.0,
+            to: address(&a[6])?,
             value: a[7].parse()?,
         };
         client.build_broadcast_unshield_base_token(keys, &unshield, &offer, artifacts)?
@@ -166,23 +190,99 @@ fn broadcast_command<S: ChainStore>(
         client.build_broadcast_transfer(keys, &transfer, &offer, artifacts)?
     } else {
         let unshield = Unshield {
-            to: a[6].parse::<EvmAddress>()?.0,
+            to: address(&a[6])?,
             token,
             value: a[8].parse()?,
         };
         client.build_broadcast_unshield(keys, &unshield, &offer, artifacts)?
     };
-    println!(
-        "fee {} to {} ({} gas at {} wei)",
-        tx.fee, offer.railgun_address, tx.gas_estimate, tx.gas_price
-    );
-    if a.last().map(String::as_str) == Some("--send") {
-        println!(
-            "0x{}",
-            hex::encode(client.broadcast(&mut broadcasters, &tx)?)
-        );
+    hand_over(client, &mut broadcasters, &offer, &tx, a)
+}
+
+/// Uniswap's SwapRouter02 on Arbitrum.
+const SWAP_ROUTER: &str = "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45";
+
+/// The unshield fee on Arbitrum, in basis points.
+const UNSHIELD_FEE_BPS: u128 = 25;
+
+fn word(bytes: &[u8]) -> [u8; 32] {
+    let mut w = [0u8; 32];
+    w[32 - bytes.len()..].copy_from_slice(bytes);
+    w
+}
+
+/// `selector` then static arguments, each left-padded to a word.
+fn encode(selector: [u8; 4], args: &[&[u8]]) -> Vec<u8> {
+    let mut data = selector.to_vec();
+    for a in args {
+        data.extend(word(a));
     }
-    Ok(())
+    data
+}
+
+/// `swap`: unshields `token in` to RelayAdapt, which approves the router, swaps in one pool, and shields both tokens back to this wallet.
+fn swap_command<S: ChainStore>(
+    client: &Client<S>,
+    keys: &WalletKeys,
+    artifacts: &Artifacts,
+    a: &[String],
+) -> Result<(), Box<dyn std::error::Error>> {
+    let network = Network::by_name(&a[1]).ok_or("unknown network")?;
+    let (token_in, value, token_out) = (address(&a[6])?, a[7].parse::<u128>()?, address(&a[8])?);
+    let (pool_fee, min_out) = (a[9].parse::<u32>()?, a[10].parse::<u128>()?);
+    let (relay_adapt, router) = (address(network.relay_adapt)?, address(SWAP_ROUTER)?);
+    // What RelayAdapt receives once the contract keeps its fee.
+    let amount_in = value - value * UNSHIELD_FEE_BPS / 10_000;
+    // approve(address,uint256) and exactInputSingle((tokenIn, tokenOut, fee, recipient, amountIn, amountOutMinimum, sqrtPriceLimitX96)).
+    let approve = encode(
+        [0x09, 0x5e, 0xa7, 0xb3],
+        &[&router, &amount_in.to_be_bytes()],
+    );
+    let swap = encode(
+        [0x04, 0xe4, 0x5a, 0xaf],
+        &[
+            &token_in,
+            &token_out,
+            &pool_fee.to_be_bytes(),
+            &relay_adapt,
+            &amount_in.to_be_bytes(),
+            &min_out.to_be_bytes(),
+            &[0],
+        ],
+    );
+    let receiver = keys.address()?;
+    let calls = CrossContractCalls {
+        unshields: vec![(token_in, value)],
+        calls: vec![
+            ContractCall {
+                to: token_in,
+                data: approve,
+                value: 0,
+            },
+            ContractCall {
+                to: router,
+                data: swap,
+                value: 0,
+            },
+        ],
+        shields: vec![token_out, token_in],
+        shield_receiver: &receiver,
+        min_gas_limit: CROSS_CONTRACT_MIN_GAS_LIMIT,
+    };
+    if !a.iter().any(|f| f == "--broadcast") {
+        let tx = client.build_cross_contract_calls(keys, &calls, artifacts)?;
+        println!(
+            "{}",
+            serde_json::json!({"label": "swap", "to": tx.to, "value": tx.value.to_string(), "data": tx.data_hex()})
+        );
+        return Ok(());
+    }
+    let mut broadcasters = Broadcasters::new(Waku::railgun()?, network.chain_id);
+    let offer = broadcasters
+        .best_offer(&token_in, POI_LIST, Some(&relay_adapt))?
+        .ok_or("no live broadcaster takes this token through RelayAdapt")?;
+    let tx = client.build_broadcast_cross_contract_calls(keys, &calls, &offer, artifacts)?;
+    hand_over(client, &mut broadcasters, &offer, &tx, a)
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -200,9 +300,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .map_err(|_| "expected 32 bytes".into())
     };
 
-    let address = |s: &str| -> Result<[u8; 20], Box<dyn std::error::Error>> {
-        Ok(s.parse::<EvmAddress>()?.0)
-    };
     let print_tx = |tx: &UnsignedTx| {
         println!(
             "{}",
@@ -285,6 +382,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("after: {:?}", client.poi_status(&proof)?);
             }
         }
+        "swap" => swap_command(&client, &keys, &artifacts, &a)?,
         "broadcasters" | "broadcast-transfer" | "broadcast-unshield" | "broadcast-unshield-eth" => {
             broadcast_command(&client, &keys, &artifacts, &a)?;
         }

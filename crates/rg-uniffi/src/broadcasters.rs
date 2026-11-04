@@ -45,7 +45,7 @@ impl RailgunBroadcasters {
             .collect())
     }
 
-    /// The cheapest live offer for `token`, if any. With `relay_adapt`, only from broadcasters that submit through this network's RelayAdapt, as an unshield to ETH needs.
+    /// The cheapest live offer for `token`, if any. With `relay_adapt`, only from broadcasters that submit through this network's RelayAdapt, as an unshield to ETH or cross-contract calls need.
     pub fn best_offer(
         &self,
         token: String,

@@ -8,8 +8,8 @@ use rg_keys::EvmAddress;
 use rg_sync::Network;
 
 use crate::{
-    BroadcastTransaction, BroadcasterOffer, EvmAccount, FeeQuote, HistoryItem, PoiSubmission,
-    RailgunBroadcasters, RailgunError, SyncReport, TokenBalance, UnsignedTx, Wallet,
+    BroadcastTransaction, BroadcasterOffer, CrossContractCalls, EvmAccount, FeeQuote, HistoryItem,
+    PoiSubmission, RailgunBroadcasters, RailgunError, SyncReport, TokenBalance, UnsignedTx, Wallet,
 };
 
 fn hash(value: &str) -> Result<[u8; 32], RailgunError> {
@@ -19,7 +19,7 @@ fn hash(value: &str) -> Result<[u8; 32], RailgunError> {
         .ok_or_else(|| RailgunError::invalid(format!("expected a 32-byte hash: {value}")))
 }
 
-fn address(value: &str) -> Result<[u8; 20], RailgunError> {
+pub(crate) fn address(value: &str) -> Result<[u8; 20], RailgunError> {
     Ok(value.parse::<EvmAddress>()?.0)
 }
 
@@ -129,6 +129,20 @@ impl RailgunClient {
         let tx = self.client().build_unshield_base_token(
             wallet.spending()?,
             &unshield,
+            &self.artifacts,
+        )?;
+        Ok(tx.into())
+    }
+
+    /// Unshields to RelayAdapt, makes `calls.calls` from it and shields back, in one call to sign and send from your own account. It reverts if any call fails.
+    pub fn build_cross_contract_calls(
+        &self,
+        wallet: &Wallet,
+        calls: CrossContractCalls,
+    ) -> Result<UnsignedTx, RailgunError> {
+        let tx = self.client().build_cross_contract_calls(
+            wallet.spending()?,
+            &calls.to_core()?,
             &self.artifacts,
         )?;
         Ok(tx.into())
@@ -275,6 +289,22 @@ impl RailgunClient {
         let tx = self.client().build_broadcast_unshield_base_token(
             wallet.spending()?,
             &unshield,
+            &offer.offer,
+            &self.artifacts,
+        )?;
+        Ok(Arc::new(BroadcastTransaction { tx }))
+    }
+
+    /// Proves cross-contract calls for `offer`'s broadcaster to submit, paying it in the first token unshielded; pick the offer with `best_offer(that token, true)`. The calls may fail without reverting, so the fee is paid either way and the shields still run.
+    pub fn build_broadcast_cross_contract_calls(
+        &self,
+        wallet: &Wallet,
+        calls: CrossContractCalls,
+        offer: &BroadcasterOffer,
+    ) -> Result<Arc<BroadcastTransaction>, RailgunError> {
+        let tx = self.client().build_broadcast_cross_contract_calls(
+            wallet.spending()?,
+            &calls.to_core()?,
             &offer.offer,
             &self.artifacts,
         )?;

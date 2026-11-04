@@ -23,8 +23,9 @@ impl Route {
         }
     }
 
-    pub(crate) fn is_relay(&self) -> bool {
-        self.relay.is_some()
+    /// The RelayAdapt contract the batch goes through, if any.
+    pub(crate) fn relay_adapt(&self) -> Option<[u8; 20]> {
+        self.relay.as_ref().map(|(contract, _)| *contract)
     }
 
     /// Commits each transaction to the action and its batch's nullifiers, so only RelayAdapt can submit them, and only with that action.
@@ -49,6 +50,20 @@ impl Route {
         match &self.relay {
             Some((_, action)) => relay_calldata(transactions, action.clone()),
             None => transact_calldata(transactions),
+        }
+    }
+
+    /// As [`Route::calldata`], but with the calls required to succeed, so a gas estimate fails where they would, as the engine does for cross-contract calls. Estimates skip the adapt params check, so this does not change what the batch is bound to.
+    pub(crate) fn estimate_calldata(&self, transactions: Vec<abi::Transaction>) -> Vec<u8> {
+        match &self.relay {
+            Some((_, action)) => relay_calldata(
+                transactions,
+                abi::ActionData {
+                    requireSuccess: true,
+                    ..action.clone()
+                },
+            ),
+            None => self.calldata(transactions),
         }
     }
 }

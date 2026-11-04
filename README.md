@@ -26,6 +26,9 @@ example is a command line over the API.
   POI is valid, as the TS SDK does.
 - Native ETH: shielding it, and unshielding to it, through the RelayAdapt contract,
   with your own account or a broadcaster paying gas.
+- Cross-contract calls through RelayAdapt, such as a swap: unshield, call, and shield the
+  result back in one transaction, with your own account or a broadcaster paying gas. The
+  caller builds the calls; there is no swap quoting here.
 - View-only wallets from a shareable viewing key, in the engine's format.
 - POI proofs, submitted to the aggregator, so recipients can spend what they receive.
 - Broadcasters over Waku: signed fee offers, the fee note, pre-transaction POIs, and the
@@ -40,8 +43,8 @@ The engine also gets the same trees, notes and balances for all of Sepolia's his
 to block 12031295. On Arbitrum, Rust-built transfers, an unshield and a two-input
 transfer were mined and their POI proofs reached `Valid`. Anon wallet saw the funds as
 spendable. So did an 11-note transfer split into two Railgun transactions, an unshield to
-ETH through RelayAdapt, and a transfer and an unshield to ETH that broadcasters submitted
-over Waku.
+ETH through RelayAdapt, a WETH to USDC swap on Uniswap through RelayAdapt, shielded back,
+and a transfer and an unshield to ETH that broadcasters submitted over Waku.
 
 ## Crates
 
@@ -104,7 +107,8 @@ let hash = client.broadcast(&mut broadcasters, &tx)?;
 
 `crates/rg-core/examples/wallet.rs` covers `sync`, `balance`, `history`, `transfer`,
 `unshield`, `unshield-eth`, `shield`, `shield-eth`, `estimate`, `send`, `poi`,
-`broadcasters`, `broadcast-transfer`, `broadcast-unshield` and `broadcast-unshield-eth`:
+`broadcasters`, `broadcast-transfer`, `broadcast-unshield`, `broadcast-unshield-eth` and
+`swap`:
 
 ```sh
 cargo run --release -p rg-core --example wallet -- arbitrum <rpc url> <data dir> <mnemonic file> balance
@@ -129,8 +133,6 @@ again on every load.
 
 ## Not supported yet
 
-- DeFi calls through RelayAdapt, with or without a broadcaster. Only its ETH shield and
-  unshield are built.
 - Running inside a real Android app, and timings on real phones.
 
 Not planned: NFTs; legacy (pre-2023) events, so a wallet with notes from before the

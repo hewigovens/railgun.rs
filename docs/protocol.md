@@ -118,7 +118,7 @@ Proofs are not deterministic, so the test is that the verifying key and the cont
 
 ## Relaying
 
-A self-signed transaction links the account paying gas to it. Native ETH and DeFi calls go through RelayAdapt (`contracts/relay-adapt/*`); this core uses it for ETH.
+A self-signed transaction links the account paying gas to it. Native ETH and DeFi calls go through RelayAdapt (`contracts/relay-adapt/*`). A relay's action is `{random, requireSuccess, minGasLimit, calls}`; for cross-contract calls the calls are the caller's, then `shield` of each token with value 0, which shields RelayAdapt's whole balance, and `minGasLimit` is the requested gas, 3,200,000 by default, less 150,000.
 
 Broadcasters (`waku-broadcaster-client` 10.0.1, shared-models 8.2.1):
 

@@ -149,6 +149,14 @@ to RelayAdapt, and the bound params commit to RelayAdapt and to a hash of the nu
 and the follow-up calls, `unwrapBase` and a transfer of the ETH to the recipient. The
 nullifiers are known before proving, so no dummy proof is needed to make that hash.
 
+Cross-contract calls, such as a swap, take the same path: the transactions unshield each
+token to RelayAdapt, and the action holds the caller's calls, then one `shield` of
+RelayAdapt's whole balance of each listed token back to a 0zk address. The caller builds
+the calls, approvals included, since they run from RelayAdapt's address. The action's
+`minGasLimit` is the requested gas less 150,000, and the relay checks `gasleft()` against
+it, so a broadcaster cannot starve the calls. A self-sent relay requires every call to
+succeed.
+
 ## A broadcast transfer
 
 A broadcaster sends the batch from its own account, so no account of the user's shows on
@@ -194,7 +202,10 @@ the fee note is in wrapped ETH. Only offers whose `relayAdapt` is this network's
 RelayAdapt are taken. The nullifiers, and so the relay hash the transactions commit to,
 change with every re-plan, so each round binds them again before estimating. Broadcasters
 refuse a relay whose calls must succeed, so, as in the engine, a failed unwrap or send
-leaves the ETH in RelayAdapt: the recipient must accept ETH.
+leaves the ETH in RelayAdapt. The gas estimate requires the calls to succeed, so a
+recipient that refuses ETH fails it before anything is sent. Cross-contract calls go the
+same way, with the fee in the first token unshielded; if a call fails once sent, the fee
+is still paid and the shields return what RelayAdapt holds.
 
 `Waku` is a light client. It never joins the relay mesh. It reads offers and answers
 with store queries, and hands requests to a node with light push. It finds nodes through

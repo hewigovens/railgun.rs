@@ -9,8 +9,8 @@ use serde_json::{Map, Value, json};
 
 use crate::route::Route;
 use crate::{
-    Artifacts, ChainStore, Client, Error, POI_LIST, Transfer, Unshield, UnshieldBaseToken,
-    UnsignedTx,
+    Artifacts, ChainStore, Client, CrossContractCalls, Error, POI_LIST, Transfer, Unshield,
+    UnshieldBaseToken, UnsignedTx,
 };
 
 /// The contract skips proof checks when the sender is this, so gas can be estimated before proving (`DUMMY_FROM_ADDRESS`).
@@ -95,9 +95,6 @@ impl<S: ChainStore> Client<S> {
         artifacts: &Artifacts,
     ) -> Result<BroadcastTx, Error> {
         let (to_relay_adapt, route) = self.base_token_route(unshield, false)?;
-        if offer.relay_adapt != Some(to_relay_adapt.to) {
-            return Err(Error::NotOffered);
-        }
         self.build_broadcast(
             keys,
             to_relay_adapt.token,
@@ -107,6 +104,26 @@ impl<S: ChainStore> Client<S> {
             |fee, min_gas_price| {
                 self.plan_unshield(keys, &to_relay_adapt, Some(fee), min_gas_price)
             },
+        )
+    }
+
+    /// Plans and proves unshields and calls for `offer`'s broadcaster to submit through this network's RelayAdapt, paying it in the first token unshielded. The calls may fail without reverting, so the fee is paid either way; the shields still run and take back what RelayAdapt holds of the listed tokens.
+    pub fn build_broadcast_cross_contract_calls(
+        &self,
+        keys: &WalletKeys,
+        calls: &CrossContractCalls,
+        offer: &BroadcasterFees,
+        artifacts: &Artifacts,
+    ) -> Result<BroadcastTx, Error> {
+        let (unshields, route) = self.cross_contract_route(calls, false)?;
+        let token = unshields.first().ok_or(Error::NotOffered)?.token;
+        self.build_broadcast(
+            keys,
+            token,
+            offer,
+            &route,
+            artifacts,
+            |fee, min_gas_price| self.plan_unshields(keys, &unshields, Some(fee), min_gas_price),
         )
     }
 
@@ -121,7 +138,8 @@ impl<S: ChainStore> Client<S> {
         plan: impl Fn(BroadcasterFee, u128) -> Result<Vec<TransferParams<'a>>, Error>,
     ) -> Result<BroadcastTx, Error> {
         let broadcaster = decode_address(&offer.railgun_address)?;
-        if !offer.fees.contains_key(&token) {
+        let through = route.relay_adapt();
+        if !offer.fees.contains_key(&token) || through.is_some() && offer.relay_adapt != through {
             return Err(Error::NotOffered);
         }
         let (gas_price, min_gas_price) = if self.network.broadcaster_min_gas_price {
@@ -170,11 +188,11 @@ impl<S: ChainStore> Client<S> {
             pre_transaction_pois: json!({ (POI_LIST): by_leaf }),
             broadcaster_viewing_key: offer.viewing_public_key,
             fees_id: offer.fees_id.clone(),
-            use_relay_adapt: route.is_relay(),
+            use_relay_adapt: through.is_some(),
         })
     }
 
-    /// Gas for the batch with empty proofs, sent from the address the contract does not check proofs for.
+    /// Gas for the batch with empty proofs, sent from the address the contract does not check proofs for. It fails if a relay's calls would.
     fn estimate_unproved(
         &self,
         keys: &WalletKeys,
@@ -185,7 +203,7 @@ impl<S: ChainStore> Client<S> {
             .iter()
             .map(|p| Ok(p.prepare(keys)?.transaction(&Proof::default())))
             .collect::<Result<Vec<_>, Error>>()?;
-        let data = format!("0x{}", hex::encode(route.calldata(txs)));
+        let data = format!("0x{}", hex::encode(route.estimate_calldata(txs)));
         Ok(self.rpc.estimate_gas(ESTIMATE_FROM, route.to, 0, &data)?)
     }
 

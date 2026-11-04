@@ -33,6 +33,9 @@ engine accepts. Missing features are in the README under "Not supported yet".
 - Unshielding to ETH uses the RelayAdapt contract, as engine 9.6.0 does. Wallet SDK 11.2.0
   prefers an EIP-7702 path through an ephemeral account where a network has one; RelayAdapt
   still works on Ethereum, Arbitrum and Sepolia.
+- A broadcaster relay's gas estimate requires its calls to succeed. The engine does so for
+  cross-contract calls but not for an unshield to ETH, where a recipient that refuses ETH
+  only shows once the broadcaster has sent it and the ETH sits in RelayAdapt.
 - History is simpler than the SDK's: shields, receipts, sends and unshields per token and
   transaction. Change and transfers to yourself are left out, and an unshield's value is
   what it took from the wallet, before the contract's fee.
