@@ -329,6 +329,11 @@ impl RailgunClient {
         Ok(format!("0x{}", hex::encode(hash)))
     }
 
+    /// Lets later spends use other notes than those of batches handed to a broadcaster and not yet seen on chain. Should a broadcaster still submit one, both land.
+    pub fn forget_pending_broadcasts(&self) -> Result<(), RailgunError> {
+        Ok(self.client()?.forget_pending_broadcasts()?)
+    }
+
     /// Proves POI for a sent transaction. Sync past it first.
     pub fn prove_poi(
         &self,

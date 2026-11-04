@@ -7,6 +7,7 @@ use std::path::PathBuf;
 use rg_sync::RawLog;
 
 use crate::Error;
+use crate::pending_spends::Spend;
 
 pub trait ChainStore {
     /// Leaf hashes from the indexer, in `seed_from_text` form.
@@ -22,9 +23,12 @@ pub trait ChainStore {
     /// Txid tree leaves past the reorg window, with the squid id of the last one.
     fn txid_leaves(&self) -> Result<(Vec<[u8; 32]>, Option<String>), Error>;
     fn append_txid_leaves(&mut self, leaves: &[(String, [u8; 32])]) -> Result<(), Error>;
+    /// The notes of each batch handed to a broadcaster and not yet seen spent.
+    fn pending_spends(&self) -> Result<Vec<Vec<Spend>>, Error>;
+    fn save_pending_spends(&mut self, batches: &[Vec<Spend>]) -> Result<(), Error>;
 }
 
-/// One directory per network: `leaves.txt`, `logs.jsonl`, `cursor`, `txid-leaves.txt`.
+/// One directory per network: `leaves.txt`, `logs.jsonl`, `cursor`, `txid-leaves.txt`, `pending-spends.txt`.
 pub struct FileStore {
     dir: PathBuf,
 }
@@ -138,6 +142,33 @@ impl ChainStore for FileStore {
             text.push_str(&format!("{id} {}\n", hex::encode(leaf)));
         }
         self.append("txid-leaves.txt", &text)
+    }
+
+    fn pending_spends(&self) -> Result<Vec<Vec<Spend>>, Error> {
+        let corrupt = || Error::Corrupt("pending spends");
+        let spend = |s: &str| {
+            let (tree, nullifier) = s.split_once(':')?;
+            let nullifier = hex::decode(nullifier).ok()?.try_into().ok()?;
+            Some((tree.parse().ok()?, nullifier))
+        };
+        self.lines("pending-spends.txt")?
+            .iter()
+            .map(|line| line.split(' ').map(spend).collect::<Option<Vec<_>>>())
+            .collect::<Option<_>>()
+            .ok_or_else(corrupt)
+    }
+
+    fn save_pending_spends(&mut self, batches: &[Vec<Spend>]) -> Result<(), Error> {
+        let mut text = String::new();
+        for batch in batches {
+            let spends: Vec<String> = batch
+                .iter()
+                .map(|(tree, n)| format!("{tree}:{}", hex::encode(n)))
+                .collect();
+            text.push_str(&spends.join(" "));
+            text.push('\n');
+        }
+        self.replace("pending-spends.txt", &text)
     }
 }
 

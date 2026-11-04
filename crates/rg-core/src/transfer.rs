@@ -217,20 +217,21 @@ impl<S: ChainStore> Client<S> {
         keys: &WalletKeys,
         token_hash: &[u8; 32],
         value: u128,
-        plan: impl FnOnce(&ScanResult) -> Result<Vec<TransferParams<'a>>, rg_tx::Error>,
+        plan: impl Fn(&ScanResult) -> Result<Vec<TransferParams<'a>>, rg_tx::Error>,
     ) -> Result<Vec<TransferParams<'a>>, Error> {
         let spendable = self.spendable_scan(keys)?;
-        match plan(&spendable) {
+        let planned = match plan(&spendable) {
             Err(rg_tx::Error::InsufficientNote(_)) => {
                 let of = |scan: &ScanResult| scan.balances().get(token_hash).copied().unwrap_or(0);
-                if of(&spendable) < value && value <= of(&self.scan(keys)) {
+                return if of(&spendable) < value && value <= of(&self.scan(keys)) {
                     Err(Error::AwaitingPoi(value))
                 } else {
                     Err(rg_tx::Error::InsufficientNote(value).into())
-                }
+                };
             }
-            planned => Ok(planned?),
-        }
+            planned => planned?,
+        };
+        self.spend_held_notes_first(keys, token_hash, &spendable, planned, plan)
     }
 
     /// One call along `route` with every planned transaction, proved.

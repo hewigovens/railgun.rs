@@ -46,6 +46,10 @@ pub enum Error {
     AwaitingPoi(u128),
     #[error("broadcaster: {0}")]
     Broadcaster(#[from] rg_broadcaster::Error),
+    #[error(
+        "a broadcaster may still submit an earlier batch of this token, so this spend must use its notes, and they do not cover it; sync once it lands, or forget it"
+    )]
+    HeldByBroadcaster,
     #[error("the broadcaster takes no fee in this token")]
     NotOffered,
     #[error("the broadcaster refused the transaction: {0}")]

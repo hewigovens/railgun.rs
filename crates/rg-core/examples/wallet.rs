@@ -123,7 +123,7 @@ fn now_ms() -> u64 {
 
 /// Prints the fee, and with `--send` last hands the batch to its broadcaster.
 fn hand_over<S: ChainStore>(
-    client: &Client<S>,
+    client: &mut Client<S>,
     broadcasters: &mut Broadcasters,
     offer: &BroadcasterFees,
     tx: &BroadcastTx,
@@ -141,7 +141,7 @@ fn hand_over<S: ChainStore>(
 
 /// `broadcasters`, `broadcast-transfer`, `broadcast-unshield` and `broadcast-unshield-eth`.
 fn broadcast_command<S: ChainStore>(
-    client: &Client<S>,
+    client: &mut Client<S>,
     keys: &WalletKeys,
     artifacts: &Artifacts,
     a: &[String],
@@ -222,7 +222,7 @@ fn encode(selector: [u8; 4], args: &[&[u8]]) -> Vec<u8> {
 
 /// `swap`: unshields `token in` to RelayAdapt, which approves the router, swaps in one pool, and shields both tokens back to this wallet.
 fn swap_command<S: ChainStore>(
-    client: &Client<S>,
+    client: &mut Client<S>,
     keys: &WalletKeys,
     artifacts: &Artifacts,
     a: &[String],
@@ -382,9 +382,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("after: {:?}", client.poi_status(&proof)?);
             }
         }
-        "swap" => swap_command(&client, &keys, &artifacts, &a)?,
+        "swap" => swap_command(&mut client, &keys, &artifacts, &a)?,
         "broadcasters" | "broadcast-transfer" | "broadcast-unshield" | "broadcast-unshield-eth" => {
-            broadcast_command(&client, &keys, &artifacts, &a)?;
+            broadcast_command(&mut client, &keys, &artifacts, &a)?;
         }
         other => return Err(format!("unknown command {other}").into()),
     }

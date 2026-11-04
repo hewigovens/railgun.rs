@@ -113,7 +113,8 @@ a hidden `Nullified` event changes no root. `FileStore` keeps the seed, logs and
 and `Client::open` replays them; a stored log that no longer applies is dropped with
 everything after it, to be fetched again. The RPC URL must be https, or plain http to this
 machine. Seeded leaves are hashes only, so a wallet's notes
-must all come after the seed. A nullifier
+must all come after the seed. The reorg window can reach back into seeded leaves; a refetched
+log fills in their bare hashes rather than adding them again. A nullifier
 hashes only the leaf position, so lookups are always scoped to a tree.
 
 ## A private transfer
@@ -217,6 +218,20 @@ recipient that refuses ETH fails it before anything is sent. Cross-contract call
 same way, with the fee in the first token unshielded; if a call fails once sent, the fee
 is still paid and the shields return what RelayAdapt holds.
 
+A transfer or unshield split into several transactions also goes through RelayAdapt, with
+no calls: sent straight to the Railgun contract, each transaction could be submitted alone,
+so a broadcaster could take its fee from the first and hold back the rest. Through
+RelayAdapt every transaction commits to the batch's nullifiers, so it lands whole or not
+at all.
+
+A broadcaster can sit on a batch, answer with nothing or a hash no node has, and submit
+it later. So `Client::broadcast` holds the batch's notes in the store before handing it
+over, and a later spend of the same token, from either path, must spend one of them too:
+at most one of the two lands. When the held notes cannot cover it, planning fails with
+`HeldByBroadcaster`. A sync that sees any of a batch's notes spent lets go of it, and
+`Client::forget_pending_broadcasts` lets go of all of them for a user who accepts both
+landing.
+
 `Waku` is a light client. It never joins the relay mesh. It reads offers and answers
 with store queries, and hands requests to a node with light push. It finds nodes through
 the fleet's ENR tree in DNS, checked against the tree's pinned key, falling back to the
@@ -274,7 +289,7 @@ made with older keys. `docs/development.md` records the current IPFS root.
 
 ## Key material
 
-The core never stores a key. `FileStore` holds chain data only, and a shell keeps the mnemonic in the iOS Keychain or behind the Android Keystore, device-only and unlocked-only, then builds a `Wallet` when it needs one.
+The core never stores a key. `FileStore` holds chain data, and the nullifiers of batches handed to a broadcaster and not yet seen on chain, which mark those notes as the wallet's to anyone who reads the directory. A shell keeps the mnemonic in the iOS Keychain or behind the Android Keystore, device-only and unlocked-only, then builds a `Wallet` when it needs one.
 
 | Secret | Handling |
 | --- | --- |

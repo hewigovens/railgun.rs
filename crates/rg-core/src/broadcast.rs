@@ -4,11 +4,13 @@ use rand::RngCore;
 use rg_broadcaster::{BroadcasterFees, Broadcasters, TransactRequest, TransactResponse};
 use rg_keys::{WalletKeys, decode_address};
 use rg_prover::ark_types::Proof;
-use rg_tx::{BroadcasterFee, TransferParams};
+use rg_tx::{BroadcasterFee, TransferParams, bind_together_action};
 use serde_json::{Map, Value, json};
 
 use crate::fee_quote::plausible_price;
+use crate::pending_spends::{Spend, spends};
 use crate::route::Route;
+use crate::send::address;
 use crate::{
     Artifacts, ChainStore, Client, CrossContractCalls, Error, POI_LIST, Transfer, Unshield,
     UnshieldBaseToken, UnsignedTx,
@@ -47,6 +49,8 @@ pub struct BroadcastTx {
     pub fees_id: String,
     /// Sent to RelayAdapt rather than the Railgun contract.
     pub use_relay_adapt: bool,
+    /// The notes it spends, held once it is handed over.
+    pub spends: Vec<Spend>,
 }
 
 fn shape(planned: &[TransferParams]) -> Vec<(usize, usize)> {
@@ -148,13 +152,18 @@ impl<S: ChainStore> Client<S> {
         plan: impl Fn(BroadcasterFee, u128) -> Result<Vec<TransferParams<'a>>, Error>,
     ) -> Result<BroadcastTx, Error> {
         let broadcaster = decode_address(&offer.railgun_address)?;
-        let through = route.relay_adapt();
-        if !offer.fees.contains_key(&token)
-            || !offer.is_live(now_ms())
-            || through.is_some() && offer.relay_adapt != through
-        {
+        if !offer.fees.contains_key(&token) || !offer.is_live(now_ms()) {
             return Err(Error::NotOffered);
         }
+        // Sent straight to the Railgun contract, each transaction of a batch could be submitted alone, so the broadcaster could take its fee from the first and hold back the rest.
+        let together = match route.relay_adapt() {
+            Some(_) => None,
+            None => Some(self.bound_together_route()?),
+        };
+        let route_for = |planned: &[TransferParams]| match &together {
+            Some(together) if planned.len() > 1 => together,
+            _ => route,
+        };
         // Bounded, so the products below cannot overflow and a lying node cannot set the fee at will.
         let (gas_price, min_gas_price) = if self.network.broadcaster_min_gas_price {
             let price = plausible_price(self.rpc.gas_price()?)?;
@@ -169,11 +178,11 @@ impl<S: ChainStore> Client<S> {
         };
         let plan_bound = |fee| {
             let mut planned = plan(fee_of(fee), min_gas_price)?;
-            route.bind(keys, &mut planned);
+            route_for(&planned).bind(keys, &mut planned);
             Ok::<_, Error>(planned)
         };
         let mut planned = plan_bound(0)?;
-        let mut gas_estimate = self.estimate_unproved(keys, &planned, route)?;
+        let mut gas_estimate = self.estimate_unproved(keys, &planned, route_for(&planned))?;
         let mut fee = 0;
         for _ in 0..FEE_ROUNDS {
             let gas_limit = u128::from(gas_estimate + gas_estimate / 5);
@@ -186,7 +195,12 @@ impl<S: ChainStore> Client<S> {
             if same {
                 break;
             }
-            gas_estimate = self.estimate_unproved(keys, &planned, route)?;
+            gas_estimate = self.estimate_unproved(keys, &planned, route_for(&planned))?;
+        }
+        let route = route_for(&planned);
+        let through = route.relay_adapt();
+        if through.is_some() && offer.relay_adapt != through {
+            return Err(Error::NotOffered);
         }
 
         let mut by_leaf = Map::new();
@@ -204,7 +218,16 @@ impl<S: ChainStore> Client<S> {
             broadcaster_viewing_key: offer.viewing_public_key,
             fees_id: offer.fees_id.clone(),
             use_relay_adapt: through.is_some(),
+            spends: spends(keys, &planned),
         })
+    }
+
+    fn bound_together_route(&self) -> Result<Route, Error> {
+        let mut random = [0u8; 31];
+        rand::rngs::OsRng.fill_bytes(&mut random);
+        let action = bind_together_action(random);
+        let relay_adapt = address(self.network.relay_adapt)?;
+        Ok(Route::relay(self.network.relay_adapt, relay_adapt, action))
     }
 
     /// Gas for the batch with empty proofs, sent from the address the contract does not check proofs for. It fails if a relay's calls would.
@@ -222,9 +245,9 @@ impl<S: ChainStore> Client<S> {
         self.node_estimate(ESTIMATE_FROM, route.to, 0, &data)
     }
 
-    /// Sends the batch to its broadcaster and waits for the hash of the transaction it submitted.
+    /// Sends the batch to its broadcaster and waits for the hash of the transaction it submitted. Its notes stay held until a sync shows them spent, whatever the answer, since the broadcaster can submit it later.
     pub fn broadcast(
-        &self,
+        &mut self,
         broadcasters: &mut Broadcasters,
         tx: &BroadcastTx,
     ) -> Result<[u8; 32], Error> {
@@ -240,6 +263,7 @@ impl<S: ChainStore> Client<S> {
             pre_transaction_pois: &tx.pre_transaction_pois,
         };
         let sealed = request.seal(|b| rand::rngs::OsRng.fill_bytes(b))?;
+        self.hold(&tx.spends)?;
         match broadcasters.submit(&sealed, ANSWER_TIMEOUT)? {
             TransactResponse::Submitted(hash) => {
                 self.check_submitted(&hash, &tx.tx)?;

@@ -118,6 +118,7 @@ impl<S: ChainStore> Client<S> {
             new_logs += logs.len() as u64;
             from = to + 1;
         }
+        self.release_spent()?;
         Ok(SyncReport {
             head,
             new_logs,

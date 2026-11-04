@@ -45,6 +45,15 @@ engine accepts. Missing features are in the README under "Not supported yet".
 - A broadcaster relay's gas estimate requires its calls to succeed. The engine does so for
   cross-contract calls but not for an unshield to ETH, where a recipient that refuses ETH
   only shows once the broadcaster has sent it and the ETH sits in RelayAdapt.
+- A broadcast transfer or unshield split into several transactions goes through
+  RelayAdapt with no calls, which binds them together; the engine sends them straight to
+  the Railgun contract, where a broadcaster could submit only the one with its fee.
+- After a batch goes to a broadcaster, a later spend of the same token must spend one of
+  its notes until a sync shows them spent, so a withheld batch and a retry cannot both
+  land. The engine has no such hold.
+- A sent note counts only in a transaction that spent this wallet's notes. Anyone can write
+  an output that decrypts as sent by a given wallet, which would put a forged send in its
+  history.
 - History is simpler than the SDK's: shields, receipts, sends and unshields per token and
   transaction. Change and transfers to yourself are left out, and an unshield's value is
   what it took from the wallet, before the contract's fee.

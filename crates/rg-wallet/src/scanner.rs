@@ -33,6 +33,9 @@ impl<'a> Scanner<'a> {
                 self.scan_leaf(state, tree as u32, position as u32, leaf, &mut out);
             }
         }
+        // Anyone can write an output this wallet decrypts as its sender, so only a transaction that spent its notes is one it sent.
+        let ours = out.spending_transactions();
+        out.sent.retain(|s| ours.contains(&s.transaction_hash));
         out
     }
 
@@ -159,7 +162,61 @@ struct TxoFields {
 
 #[cfg(test)]
 mod tests {
+    use rg_keys::WalletKeys;
+    use rg_notes::OutputType;
+    use rg_notes::transact::{OutputNote, create_commitment_ciphertext_v2};
+    use rg_sync::{NullifierRecord, TransactCommitment};
+
     use super::*;
+
+    fn output(from: &ViewOnlyKeys, to: &ViewOnlyKeys, tx: u8) -> Leaf {
+        let note = OutputNote {
+            receiver_master_public_key: to.master_public_key,
+            receiver_viewing_public_key: to.viewing_public_key,
+            token_hash: [0; 32],
+            value: 5,
+            random: [tx; 16],
+            sender_random: [tx; 15],
+            output_type: OutputType::Transfer,
+            wallet_source: "test",
+            memo_text: None,
+        };
+        let viewing = ViewingKeys {
+            viewing_private_key: &from.viewing_private_key,
+            viewing_public_key: from.viewing_public_key,
+            master_public_key: from.master_public_key,
+        };
+        Leaf {
+            commitment: Commitment::Transact(TransactCommitment {
+                hash: field::to_be_bytes(&note.commitment()),
+                ciphertext: create_commitment_ciphertext_v2(&viewing, &note, &[1; 16], &[2; 16])
+                    .unwrap(),
+            }),
+            block_number: tx as u64,
+            transaction_hash: [tx; 32],
+        }
+    }
+
+    #[test]
+    fn an_output_is_sent_only_by_a_transaction_that_spent_our_notes() {
+        let mnemonic = "test test test test test test test test test test test junk";
+        let (me, them) = (
+            WalletKeys::from_mnemonic(mnemonic, "", 0).unwrap(),
+            WalletKeys::from_mnemonic(mnemonic, "", 1).unwrap(),
+        );
+        let mut state = SyncState::new();
+        // Ours from them in transaction 1, then an output that decrypts as ours to them in transaction 2.
+        state.leaves = vec![vec![output(&them, &me, 1), output(&me, &them, 2)]];
+        assert!(Scanner::new(&me).scan(&state).sent.is_empty());
+
+        let nullifier = field::to_be_bytes(&note::nullifier(&me.nullifying_key, 0));
+        let spent = NullifierRecord {
+            block_number: 2,
+            transaction_hash: [2; 32],
+        };
+        state.nullifiers.insert((0, nullifier), spent);
+        assert_eq!(Scanner::new(&me).scan(&state).sent.len(), 1);
+    }
 
     #[test]
     fn a_token_hash_past_the_modulus_is_not_canonical() {

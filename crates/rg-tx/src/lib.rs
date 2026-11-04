@@ -24,9 +24,9 @@ pub use plan::{
 };
 pub use prepared::Prepared;
 pub use relay_adapt::{
-    AdaptId, CROSS_CONTRACT_MIN_GAS_LIMIT, ContractCall, cross_contract_calls_action,
-    decode_call_failed, relay_adapt_params, relay_calldata, relay_shield_request,
-    shield_base_token_calldata, unshield_base_token_action,
+    AdaptId, CROSS_CONTRACT_MIN_GAS_LIMIT, ContractCall, bind_together_action,
+    cross_contract_calls_action, decode_call_failed, relay_adapt_params, relay_calldata,
+    relay_shield_request, shield_base_token_calldata, unshield_base_token_action,
 };
 pub use shield::{approve_calldata, shield_calldata};
 pub use unshield::UnshieldOutput;

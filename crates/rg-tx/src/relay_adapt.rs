@@ -96,6 +96,16 @@ pub fn unshield_base_token_action(
     }
 }
 
+/// No calls: RelayAdapt only submits the transactions, all or none, since each one's adapt params commit to every nullifier in the batch.
+pub fn bind_together_action(random: [u8; 31]) -> abi::ActionData {
+    abi::ActionData {
+        random: FixedBytes::from(random),
+        requireSuccess: false,
+        minGasLimit: U256::ZERO,
+        calls: Vec::new(),
+    }
+}
+
 /// A shield of RelayAdapt's whole balance of `token` to `receiver`, for the end of a relay (`createRelayShieldRequestsERC20s`).
 pub fn relay_shield_request(
     receiver: &AddressData,

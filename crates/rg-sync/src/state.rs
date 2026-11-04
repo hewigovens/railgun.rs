@@ -101,10 +101,29 @@ impl SyncState {
         Ok(&mut self.trees[tree])
     }
 
-    fn insert(&mut self, tree: u32, start: u32, leaves: Vec<Leaf>) -> Result<(), Error> {
+    fn insert(&mut self, tree: u32, start: u32, mut leaves: Vec<Leaf>) -> Result<(), Error> {
+        let len = self.tree_mut(tree)?.len();
+        let mut start = start as usize;
+        if start < len {
+            // Sync refetches recent blocks, which can reach back into leaves the indexer seeded: the log fills in those bare hashes.
+            let seeded = &mut self.leaves[tree as usize][start..len.min(start + leaves.len())];
+            let fills = seeded.iter().zip(&leaves).all(|(have, new)| {
+                matches!(have.commitment, Commitment::Opaque(_))
+                    && have.commitment.hash() == new.commitment.hash()
+            });
+            if !fills {
+                return Err(rg_tree::Error::NotContiguous { start, len }.into());
+            }
+            let rest = leaves.split_off(seeded.len());
+            seeded.clone_from_slice(&leaves);
+            if rest.is_empty() {
+                return Ok(());
+            }
+            (start, leaves) = (start + seeded.len(), rest);
+        }
         let hashes: Vec<Fr> = leaves.iter().map(|l| l.commitment.hash()).collect();
         let t = self.tree_mut(tree)?;
-        t.insert(start as usize, &hashes)?;
+        t.insert(start, &hashes)?;
         let root = field::to_be_bytes(&t.root());
         self.root_history.insert((tree, root));
         self.leaves[tree as usize].extend(leaves);
@@ -263,6 +282,29 @@ mod tests {
         let err = state.seed_from_text(&text).unwrap_err();
         assert!(matches!(err, Error::Range("tree number")));
         assert_eq!(state.trees.len(), 1);
+    }
+
+    #[test]
+    fn a_log_over_seeded_leaves_fills_them_in_and_appends_the_rest() {
+        let text = format!("0 0 {}\n0 1 {}\n", hash(1), hash(2));
+        let mut state = SyncState::new();
+        state.seed_from_text(&text).unwrap();
+        let leaf = |n: u8| Leaf {
+            commitment: Commitment::Opaque([n; 32]),
+            block_number: 9,
+            transaction_hash: [n; 32],
+        };
+        assert!(state.insert(0, 1, vec![leaf(9)]).is_err());
+        state.insert(0, 0, vec![leaf(1)]).unwrap();
+        state.insert(0, 1, vec![leaf(2), leaf(3)]).unwrap();
+
+        let blocks: Vec<u64> = state.leaves[0].iter().map(|l| l.block_number).collect();
+        assert_eq!(blocks, vec![9, 9, 9]);
+        let mut tree = MerkleTree::new();
+        let leaves = [[1u8; 32], [2; 32], [3; 32]].map(|h| field::from_be_bytes_mod_order(&h));
+        tree.insert(0, &leaves).unwrap();
+        assert_eq!(state.root(0), Some(tree.root()));
+        assert!(state.insert(0, 5, vec![leaf(5)]).is_err());
     }
 
     #[test]

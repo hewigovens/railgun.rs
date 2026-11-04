@@ -7,6 +7,7 @@ mod client;
 mod cross_contract_calls;
 mod error;
 mod fee_quote;
+mod pending_spends;
 mod poi;
 mod route;
 mod send;
@@ -21,6 +22,7 @@ pub use client::Client;
 pub use cross_contract_calls::CrossContractCalls;
 pub use error::Error;
 pub use fee_quote::FeeQuote;
+pub use pending_spends::Spend;
 pub use poi::{PoiProof, PoiStatus};
 pub use rg_broadcaster::{BroadcasterFees, Broadcasters, Waku};
 /// The POI list every wallet and broadcaster requires.

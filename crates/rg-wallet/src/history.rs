@@ -53,7 +53,7 @@ impl ScanResult {
                     value: 0,
                     memo: None,
                 });
-                entry.value += value;
+                entry.value = entry.value.saturating_add(value);
                 if entry.memo.is_none() {
                     entry.memo.clone_from(memo);
                 }
@@ -84,7 +84,7 @@ impl ScanResult {
                 let e = unshielded
                     .entry((spent.transaction_hash, t.token_hash))
                     .or_insert((spent.block_number, 0));
-                e.1 += t.value as i128;
+                e.1 = e.1.saturating_add(t.value as i128);
             }
         }
         for s in &self.sent {
@@ -99,7 +99,7 @@ impl ScanResult {
                 );
             }
             if let Some(e) = unshielded.get_mut(&(s.transaction_hash, s.token_hash)) {
-                e.1 -= s.value as i128;
+                e.1 = e.1.saturating_sub(s.value as i128);
             }
         }
         for ((tx, token), (block, value)) in unshielded {
@@ -205,6 +205,25 @@ mod tests {
                 (3, Send, 30, Some("thanks".into())),
                 (2, Receive, 50, None),
                 (1, Shield, 100, None),
+            ]
+        );
+    }
+
+    #[test]
+    fn totals_saturate_instead_of_overflowing() {
+        let huge = (1u128 << 120) - 1;
+        let scan = ScanResult {
+            txos: (0..300)
+                .map(|_| txo(1, TxoSource::Shield, huge, Some(2)))
+                .collect(),
+            sent: Vec::new(),
+        };
+        use HistoryKind::*;
+        assert_eq!(
+            kinds(&scan),
+            vec![
+                (2, Unshield, i128::MAX as u128, None),
+                (1, Shield, u128::MAX, None)
             ]
         );
     }

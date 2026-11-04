@@ -10,6 +10,9 @@ pub enum RailgunError {
     /// Enough of the token is there, but some of it is still waiting for POI.
     #[error("{reason}")]
     PendingPoi { reason: String },
+    /// A broadcaster may still submit an earlier batch of this token: sync once it lands, or `forget_pending_broadcasts`.
+    #[error("{reason}")]
+    HeldByBroadcaster { reason: String },
     #[error("{reason}")]
     Network { reason: String },
     #[error("{reason}")]
@@ -46,6 +49,7 @@ impl From<Error> for RailgunError {
                 RailgunError::InsufficientFunds { reason }
             }
             Error::AwaitingPoi(_) => RailgunError::PendingPoi { reason },
+            Error::HeldByBroadcaster => RailgunError::HeldByBroadcaster { reason },
             Error::Sync(rg_sync::Error::Rpc(_))
             | Error::Node(_)
             | Error::Download(..)
