@@ -290,7 +290,7 @@ node already sees the transaction a broadcaster names, it must carry the batch t
 sent.
 
 POI artifacts are versioned apart from the engine, and the live aggregator rejects proofs
-made with older keys. `docs/development.md` records the current IPFS root.
+made with older keys. `CONTRIBUTING.md` records the current IPFS root.
 
 ## Key material
 

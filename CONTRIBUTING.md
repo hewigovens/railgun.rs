@@ -1,6 +1,13 @@
-# Development
+# Contributing
 
-`AGENTS.md` has the code conventions and `justfile` the commands. Keep the target
+```sh
+just test          # all workspace tests
+just lint          # rustfmt, clippy, SwiftFormat, SwiftLint
+just test-swift    # Swift smoke test
+just test-kotlin   # Kotlin smoke test, needs Gradle
+```
+
+`AGENTS.md` has the code conventions and `justfile` the other commands. Keep the target
 directory out of a synced folder, because it gets large.
 
 ## Tests

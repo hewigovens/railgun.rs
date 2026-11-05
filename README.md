@@ -75,7 +75,12 @@ our own account and through a broadcaster, and both reached `Valid`.
 
 ## Use from Rust
 
-The crates are not on crates.io yet, so depend on them by git.
+```toml
+[dependencies]
+rg-core = "0.1"
+rg-keys = "0.1"
+rg-sync = "0.1"
+```
 
 ```rust
 use rg_core::{Artifacts, Client, FileStore, Transfer};
@@ -146,16 +151,9 @@ Not planned: NFTs; legacy (pre-2023) events, so a wallet with notes from before 
 squid seed cannot scan them; and Waku over WebSockets, since a browser wallet can use the
 TS wallet SDK.
 
-## Development
+## Contributing
 
-```sh
-just test          # all workspace tests
-just lint          # rustfmt, clippy, SwiftFormat, SwiftLint
-just test-swift    # Swift smoke test
-just test-kotlin   # Kotlin smoke test, needs Gradle
-```
-
-`docs/development.md` covers the test vectors, the TS harness, the checks that need
+`CONTRIBUTING.md` has the commands, the test vectors, the TS harness, the checks that need
 circuit artifacts or chain data, live runs, and measurements. `AGENTS.md` has the code
 conventions.
 
