@@ -1,5 +1,11 @@
 # railgun.rs
 
+[![crates.io](https://img.shields.io/crates/v/rg-core.svg)](https://crates.io/crates/rg-core)
+[![docs.rs](https://img.shields.io/docsrs/rg-core)](https://docs.rs/rg-core)
+[![CI](https://github.com/hewigovens/railgun.rs/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/hewigovens/railgun.rs/actions/workflows/ci.yml)
+[![MSRV](https://img.shields.io/badge/rustc-1.97.1+-blue.svg)](Cargo.toml)
+[![License](https://img.shields.io/crates/l/rg-core.svg)](LICENSE)
+
 A Rust implementation of a [Railgun](https://railgun.org) wallet: keys and 0zk addresses,
 note encryption, chain sync and scanning, Groth16 proofs for private transfers and
 unshields, Private Proof of Innocence (POI), broadcasters, and signing and sending. Swift
