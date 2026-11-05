@@ -20,7 +20,7 @@ edition = "2024"
 rust-version = "1.97.1"
 license = "Apache-2.0"
 repository = "https://github.com/hewigovens/railgun.rs"
-publish = false
+publish = true
 
 [workspace.dependencies]
 aes = "0.8"
@@ -53,17 +53,17 @@ prost = "0.14"
 rand = "0.8"
 rayon = "1"
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
-rg-broadcaster = { path = "crates/rg-broadcaster" }
-rg-core = { path = "crates/rg-core" }
-rg-keys = { path = "crates/rg-keys" }
-rg-notes = { path = "crates/rg-notes" }
-rg-poi = { path = "crates/rg-poi" }
-rg-primitives = { path = "crates/rg-primitives" }
-rg-prover = { path = "crates/rg-prover", default-features = false }
-rg-sync = { path = "crates/rg-sync" }
-rg-tree = { path = "crates/rg-tree" }
-rg-tx = { path = "crates/rg-tx" }
-rg-wallet = { path = "crates/rg-wallet" }
+rg-broadcaster = { version = "0.1.0", path = "crates/rg-broadcaster" }
+rg-core = { version = "0.1.0", path = "crates/rg-core" }
+rg-keys = { version = "0.1.0", path = "crates/rg-keys" }
+rg-notes = { version = "0.1.0", path = "crates/rg-notes" }
+rg-poi = { version = "0.1.0", path = "crates/rg-poi" }
+rg-primitives = { version = "0.1.0", path = "crates/rg-primitives" }
+rg-prover = { version = "0.1.0", path = "crates/rg-prover", default-features = false }
+rg-sync = { version = "0.1.0", path = "crates/rg-sync" }
+rg-tree = { version = "0.1.0", path = "crates/rg-tree" }
+rg-tx = { version = "0.1.0", path = "crates/rg-tx" }
+rg-wallet = { version = "0.1.0", path = "crates/rg-wallet" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"

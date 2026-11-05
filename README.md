@@ -51,18 +51,18 @@ our own account and through a broadcaster, and both reached `Valid`.
 
 | Crate | What it holds |
 | --- | --- |
-| `rg-primitives` | Field helpers, Poseidon (1 to 16 inputs), BabyJubJub, EdDSA, Ed25519 ECDH and blinding, AES, BLAKE-512, `PrivateKey` |
-| `rg-keys` | Railgun's BIP32 variant, wallet keys, 0zk addresses, the EVM gas account |
-| `rg-notes` | Token hashes, commitments, nullifiers, note and shield ciphertexts, memos |
-| `rg-tree` | The depth-16 Poseidon Merkle tree |
-| `rg-sync` | Event decoding, trees, nullifiers and root history; RPC and squid clients behind `rpc` |
-| `rg-wallet` | Trial decryption, TXOs, spent status, balances |
-| `rg-prover` | Circom witness from the circuit wasm (wasmi or wasmtime), snarkjs zkeys, Groth16 on arkworks |
-| `rg-tx` | Note selection, outputs, bound params, the spending signature, circuit inputs, calldata, shield, EIP-1559 |
-| `rg-poi` | Txid trees, blinded commitments, POI circuit inputs, the aggregator client |
-| `rg-broadcaster` | Broadcaster fee offers, sealed transact requests, and a Waku light client behind `waku` |
-| `rg-core` | `Client`: store, sync, scan, transfers, unshields, POI, sending, broadcasting |
-| `rg-uniffi` | Swift and Kotlin bindings over `rg-core` |
+| `rg‑primitives` | Field helpers, Poseidon (1 to 16 inputs), BabyJubJub, EdDSA, Ed25519 ECDH and blinding, AES, BLAKE-512, `PrivateKey` |
+| `rg‑keys` | Railgun's BIP32 variant, wallet keys, 0zk addresses, the EVM gas account |
+| `rg‑notes` | Token hashes, commitments, nullifiers, note and shield ciphertexts, memos |
+| `rg‑tree` | The depth-16 Poseidon Merkle tree |
+| `rg‑sync` | Event decoding, trees, nullifiers and root history; RPC and squid clients behind `rpc` |
+| `rg‑wallet` | Trial decryption, TXOs, spent status, balances |
+| `rg‑prover` | Circom witness from the circuit wasm (wasmi or wasmtime), snarkjs zkeys, Groth16 on arkworks |
+| `rg‑tx` | Note selection, outputs, bound params, the spending signature, circuit inputs, calldata, shield, EIP-1559 |
+| `rg‑poi` | Txid trees, blinded commitments, POI circuit inputs, the aggregator client |
+| `rg‑broadcaster` | Broadcaster fee offers, sealed transact requests, and a Waku light client behind `waku` |
+| `rg‑core` | `Client`: store, sync, scan, transfers, unshields, POI, sending, broadcasting |
+| `rg‑uniffi` | Swift and Kotlin bindings over `rg-core` |
 
 `docs/architecture.md` has the flows, `docs/protocol.md` the byte formats, and
 `docs/engine-differences.md` where this library differs from the TS engine.
